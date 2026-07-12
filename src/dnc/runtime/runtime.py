@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, List, Optional, Set
 from dnc.runtime.types import (
     Buffer,
     ModuleInstanceID,
+    ModuleTypeID,
     ModuleContract,
     UNBOUND,
     PENDING,
@@ -31,6 +32,19 @@ from dnc.planner.pipeline import (
 )
 from dnc.cost.semantics import CostBudget, CostForecaster, StagedCheckpointBudget
 from dnc.invariants.runtime_invariants import check_invariants
+from dnc.execution.execution_provider import ExecutionProvider, ExecutionCapability
+
+
+class ProviderMode(Enum):
+    """Per architecture.md Section 2.F: how the runtime binds ExecutionProviders.
+
+    DEV  - dispatch via the injected module-dispatch function (mock / test).
+    PROD - dispatch through a real ExecutionProvider bound at dispatch time;
+           if no provider is bound for a node's capability, fail loudly.
+    """  # noqa: E501
+
+    DEV = auto()
+    PROD = auto()
 
 
 def _is_output_bound(buf: object) -> bool:
@@ -219,11 +233,31 @@ class Runtime:
         self._module_dispatch_fn: Optional[Callable[[ModuleInstanceID], Any]] = None
         self._current_graph: Optional[ExecutionGraph] = None
 
+        # Provider integration (per architecture.md Section 2.F): providers are
+        # bound at dispatch time, not at graph construction time.
+        self._providers: List[ExecutionProvider] = []
+        self._provider_mode: ProviderMode = ProviderMode.DEV
+        self._node_capabilities: Dict[ModuleTypeID, ExecutionCapability] = {}
+
     def register_module(self, contract: ModuleContract) -> None:
         self._registry.register(contract)
 
     def set_dispatch_fn(self, fn: Callable[[ModuleInstanceID], Any]) -> None:
         self._module_dispatch_fn = fn
+
+    def register_provider(self, provider: ExecutionProvider) -> None:
+        """Register an ExecutionProvider for PROD-mode dispatch (C2/C4)."""
+        self._providers.append(provider)
+
+    def set_provider_mode(self, mode: ProviderMode) -> None:
+        """Select DEV (mock) or PROD (real provider, fail loudly) dispatch (C8)."""
+        self._provider_mode = mode
+
+    def set_node_capabilities(
+        self, mapping: Dict[ModuleTypeID, ExecutionCapability]
+    ) -> None:
+        """Map module instances to the ExecutionCapability they require."""
+        self._node_capabilities = dict(mapping)
 
     def initiate(
         self,
@@ -330,12 +364,11 @@ class Runtime:
             for mid in to_dispatch:
                 if self._backpressure_active():
                     break
-                if self._module_dispatch_fn:
-                    result = self._module_dispatch_fn(mid)
-                    es.W[mid] = Buffer.completed(es.W[mid].input, result)
-                    check_invariants(es)
-                    dispatched.append(mid)
-                    es.advance_step()
+                result = self._dispatch_node(mid, es)
+                es.W[mid] = Buffer.completed(es.W[mid].input, result)
+                check_invariants(es)
+                dispatched.append(mid)
+                es.advance_step()
 
         return dispatched
 
@@ -364,6 +397,77 @@ class Runtime:
         if all_complete:
             return AssessmentKind.OUTCOME_MET
         return AssessmentKind.OUTCOME_DEGRADED
+
+    def _select_provider(
+        self, capability: ExecutionCapability
+    ) -> Optional[ExecutionProvider]:
+        """Pick the first registered provider that supports the capability."""
+        for provider in self._providers:
+            if provider.supports(capability):
+                return provider
+        return None
+
+    def _gather_provider_input(self, mid: ModuleInstanceID, es: ExecutionState) -> Any:
+        """Collect upstream outputs as the provider input for `mid`."""
+        if self._current_graph is not None:
+            upstream = [u for (u, v) in self._current_graph.edges if v == mid]
+            if upstream:
+                return [es.W[u].output for u in upstream]
+        return None
+
+    def _dispatch_node(self, mid: ModuleInstanceID, es: ExecutionState) -> Any:
+        """Dispatch one node, routing to a provider (PROD) or the mock fn (DEV).
+
+        Per architecture.md Section 2.F: ExecutionProviders are bound at dispatch
+        time. In PROD mode the runtime dispatches through the provider that
+        supports the node's capability and fails loudly if none is bound; in DEV
+        mode it falls back to the injected module-dispatch function.
+        """
+        cap = self._node_capabilities.get(mid.type_id)
+        provider = self._select_provider(cap) if cap is not None else None
+
+        if provider is not None and self._provider_mode == ProviderMode.PROD:
+            input_val = self._gather_provider_input(mid, es)
+            result = provider.execute(cap, input_val)
+            if not result.is_success:
+                raise RuntimeError(
+                    f"Provider {provider.provider_id} failed on {mid.type_id}: "
+                    f"{result.error}"
+                )
+            return result.output
+
+        if self._module_dispatch_fn is not None:
+            return self._module_dispatch_fn(mid)
+
+        if self._provider_mode == ProviderMode.PROD:
+            raise RuntimeError(
+                f"PROD mode: no provider bound for {mid.type_id} "
+                f"(capability={cap}) and no dispatch fn registered"
+            )
+        raise RuntimeError(f"No dispatch path available for node {mid.type_id}")
+
+    def _rollback_to_checkpoint(self, es: ExecutionState) -> List[ModuleInstanceID]:
+        """Per state-management.md Section 3.C (Rollback Path) and INV-STATE-4.
+
+        Restore ES(t) to the most recent valid checkpoint. The restored state is
+        deep-isolated from the stored snapshot (from_dict), so the live ES(t)
+        and any future checkpoint can never alias the snapshot being restored
+        from (ACD-002). Restoration is performed in place so the caller's ES(t)
+        reference remains valid; the checkpoint record C(t) history is retained.
+        """
+        ck = es.C.latest()
+        if ck is None:
+            return []
+        restored = ExecutionState.from_dict(ck.es_snapshot)
+        es.W = restored.W
+        es.M = restored.M
+        es.H = restored.H
+        es._step_index = restored._step_index
+        es._rng_state = restored._rng_state
+        es.G = restored.G
+        es._validate_components()
+        self._state = ExecutionState2.RUNNING
+        return []
 
     def _execute_replan(self, es: ExecutionState) -> List[ModuleInstanceID]:
         """Execute the replanning protocol per replanning-protocol.md Section 5.1."""

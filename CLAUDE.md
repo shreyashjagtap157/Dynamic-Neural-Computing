@@ -5,7 +5,7 @@
 This is the Dynamic Neural Computation (DNC) specification project — a formal specification for researching and developing dynamic neural computing systems, with a Python implementation of Phase 1 through Phase 7.
 
 **Specification Version**: 0.1.0 (Baseline v1.0)
-**Implementation Version**: 0.1.0 (Phase 1–7 complete, 139/139 tests passing)
+**Implementation Version**: 0.1.0 (Phase 1–7 complete, 154/154 tests passing)
 
 ## Project Status
 
@@ -128,6 +128,8 @@ passes.
 |-----|----------|--------|------------|
 | ACD-001 | INV-CTRL-11 (loop termination conditions) | ✅ RESOLVED | `ExecutionState.pending_count` added; `Runtime.decide` propagates `budget_remaining`; `Runtime.act` completion guard filters already-output-bound nodes; `RulePolicy._is_all_modules_complete` requires a non-empty module set so a bare ES(t) does not terminate prematurely. Closed by `tests/conformance/runtime/test_control_loop.py` (P0B). |
 | ACD-002 | INV-STATE-4 (checkpoint immutability / no aliasing) | ✅ RESOLVED | `ExecutionState.to_dict` now deep-isolates W/M/C/H at capture time; `ExecutionState.from_dict` deep-isolates on restore; `Runtime._execute_replan` snapshots via `es.copy()`. Closed by `tests/conformance/runtime/test_replay_and_rollback.py` (P0B). |
+| ACD-003 | state-management.md §3.C (ROLLBACK path) | ✅ RESOLVED | `Runtime._rollback_to_checkpoint` implemented (was undefined → AttributeError); restores ES(t) from latest checkpoint in place, deep-isolated, C(t) history retained. Closed by `tests/conformance/runtime/test_rollback.py` (P1). |
+| ACD-004 | architecture.md §2.F (provider binding) + replay-semantics.md | ✅ RESOLVED | `ReplayEngine` now genuinely re-drives a fresh runtime (no self-compare); `Runtime` binds `ExecutionProvider` at dispatch time with `ProviderMode` DEV/PROD (PROD fails loudly when unbound); `OllamaProvider.is_available` real reachability probe; `OpenAIProvider` real retry/backoff. Closed by `tests/conformance/replay/test_replay.py`, `tests/conformance/providers/test_provider_dispatch.py` (P1). |
 
 ## Specification State Machine
 

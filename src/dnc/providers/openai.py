@@ -169,7 +169,7 @@ class OpenAIProvider(ExecutionProvider):
         req = urllib.request.Request(url, data=body, headers=headers, method="POST")
         self._add_retry_logic(req)
 
-        with urllib.request.urlopen(req, timeout=self._config.timeout_seconds) as resp:
+        with self._urlopen_with_retry(req, self._config.timeout_seconds) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             choices = data.get("choices", [])
             content = ""
@@ -200,7 +200,7 @@ class OpenAIProvider(ExecutionProvider):
         }
 
         req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=self._config.timeout_seconds) as resp:
+        with self._urlopen_with_retry(req, self._config.timeout_seconds) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             embeddings = data.get("data", [])
             if embeddings:
@@ -218,8 +218,51 @@ class OpenAIProvider(ExecutionProvider):
         else:
             return [{"role": "user", "content": str(input)}]
 
-    def _add_retry_logic(self, req: urllib.request.Request) -> None:
-        pass
+    def _add_retry_logic(
+        self, req: urllib.request.Request, attempts: Optional[int] = None
+    ) -> None:
+        """Attach retry metadata to the request.
+
+        The number of attempts is honored by `_urlopen_with_retry`, which
+        retries on transient failures (timeouts, connection errors, and 5xx
+        responses) with exponential backoff.
+        """
+        req._retry_attempts = (  # type: ignore[attr-defined]
+            attempts if attempts is not None else self._config.max_retries
+        )
+
+    def _urlopen_with_retry(
+        self, req: urllib.request.Request, timeout: float
+    ) -> Any:
+        """Open `req` with bounded exponential-backoff retries on transient errors.
+
+        Per the design intent of `_add_retry_logic`: transient failures
+        (socket/timeout errors and HTTP 5xx) are retried; permanent failures
+        (4xx) are raised immediately.
+        """
+        import time
+        import urllib.error
+
+        attempts = max(1, getattr(req, "_retry_attempts", self._config.max_retries))
+        last_err: Optional[Exception] = None
+        for attempt in range(attempts):
+            try:
+                return urllib.request.urlopen(req, timeout=timeout)
+            except urllib.error.HTTPError as e:
+                if e.code >= 500 and attempt < attempts - 1:
+                    last_err = e
+                    time.sleep(min(2**attempt * 0.1, 1.0))
+                    continue
+                raise
+            except Exception as e:  # transient: timeout / connection reset / etc.
+                if attempt < attempts - 1:
+                    last_err = e
+                    time.sleep(min(2**attempt * 0.1, 1.0))
+                    continue
+                raise
+        if last_err is not None:
+            raise last_err
+        raise RuntimeError("retry loop completed without a result")
 
     def _estimate_tokens(self, input: Any, output: Any) -> int:
         input_str = str(input)

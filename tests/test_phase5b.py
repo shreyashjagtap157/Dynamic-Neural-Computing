@@ -38,6 +38,8 @@ from dnc.execution.replay_engine import (
     ReplayStepResult,
 )
 from dnc.state.execution_state import ExecutionState
+from dnc.state.working_memory import WorkingMemory
+from dnc.runtime.runtime import Runtime, ExecutionState2
 
 
 def test_ec1_decision_policy_interface():
@@ -255,8 +257,18 @@ def test_ec15_module_invocation_record():
     print("PASS: ec15_module_invocation_record")
 
 
+def _replay_fixture():
+    """A minimal fresh runtime + ES for genuine replay (empty graph => CONTINUE)."""
+    rt = Runtime(config=None, initial_budget=100.0)
+    rt._state = ExecutionState2.RUNNING
+    es = ExecutionState()
+    es.W = WorkingMemory()
+    es.initialize_from_seed(0)
+    return rt, es
+
+
 def test_ec16_replay_engine_replay_full_trace():
-    """EC-16: ReplayEngine.replay() returns a ReplayResult."""
+    """EC-16: ReplayEngine.replay() returns a ReplayResult (genuine re-derivation)."""
     trace = ExecutionTrace(execution_id="exec_001")
     for i in range(3):
         obs = ObservationRecord(raw_signals={})
@@ -267,7 +279,8 @@ def test_ec16_replay_engine_replay_full_trace():
     trace.finalize(TerminationReason.ALL_MODULES_COMPLETE)
 
     engine = ReplayEngine()
-    result = engine.replay(trace)
+    rt, es = _replay_fixture()
+    result = engine.replay(trace, rt, es, {})
 
     assert isinstance(result, ReplayResult)
     assert result.trace_id == trace.trace_id
@@ -287,15 +300,17 @@ def test_ec17_replay_engine_detects_decision_mismatch():
     trace.finalize(TerminationReason.TERMINATE_DECISION)
 
     engine = ReplayEngine()
-    result = engine.replay(trace)
+    rt, es = _replay_fixture()
+    result = engine.replay(trace, rt, es, {})
 
     step_result = result.step_results[0]
-    assert step_result.matched, "Recorded REPLAN should match REPLAN replay"
+    assert not step_result.matched, "REPLAN must NOT match the re-derived CONTINUE decision"
+    assert "REPLAN" in (step_result.deviation_reason or "")
     print("PASS: ec17_replay_engine_detects_decision_mismatch")
 
 
 def test_ec18_replay_engine_replay_step():
-    """EC-18: ReplayEngine.replay_step() returns a ReplayStepResult for a single step."""
+    """EC-18: ReplayEngine.replay_step() re-derives and compares a single step."""
     trace = ExecutionTrace(execution_id="exec_001")
     obs = ObservationRecord(raw_signals={})
     dec = DecisionRecord(decision="CONTINUE", policy_type="rule", policy_version="1.0.0")
@@ -304,7 +319,8 @@ def test_ec18_replay_engine_replay_step():
     )
 
     engine = ReplayEngine()
-    step_result = engine.replay_step(trace, 0)
+    rt, es = _replay_fixture()
+    step_result = engine.replay_step(trace, 0, rt, es)
 
     assert isinstance(step_result, ReplayStepResult)
     assert step_result.step_index == 0
@@ -339,7 +355,8 @@ def test_ec20_replay_result_match_percentage():
     trace.finalize(TerminationReason.ALL_MODULES_COMPLETE)
 
     engine = ReplayEngine()
-    result = engine.replay(trace)
+    rt, es = _replay_fixture()
+    result = engine.replay(trace, rt, es, {})
 
     assert result.match_percentage == 100.0
     print("PASS: ec20_replay_result_match_percentage")

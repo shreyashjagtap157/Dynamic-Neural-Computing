@@ -70,6 +70,15 @@ jobs:
       - name: Run Conformance - ACD-002 Checkpoint Immutability (INV-STATE-4)
         run: python tests/conformance/runtime/test_replay_and_rollback.py
 
+      - name: Run Conformance - ACD-003 Rollback Path
+        run: python tests/conformance/runtime/test_rollback.py
+
+      - name: Run Conformance - ACD-004 Provider Dispatch (architecture §2.F)
+        run: python tests/conformance/providers/test_provider_dispatch.py
+
+      - name: Run Conformance - ACD-004 Deterministic Replay (replay-semantics)
+        run: python tests/conformance/replay/test_replay.py
+
       - name: Verify tool / fix_refs
         run: python tools/fix_refs.py --verify
 

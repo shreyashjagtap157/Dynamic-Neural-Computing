@@ -260,5 +260,19 @@ class OllamaProvider(ExecutionProvider):
             return []
 
     def is_available(self) -> bool:
-        """Check if Ollama server is reachable."""
-        return len(self.list_models()) > 0 or True
+        """Check if the Ollama server is reachable.
+
+        Per the architecture, providers must report availability truthfully so
+        the scheduler can bind a module to a live provider. A server is
+        available iff it answers a lightweight probe without error.
+        """
+        import urllib.request
+
+        try:
+            req = urllib.request.Request(
+                f"{self._config.base_url}/api/tags", method="GET"
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                return resp.status == 200
+        except Exception:
+            return False

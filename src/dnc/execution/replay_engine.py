@@ -2,7 +2,13 @@
 
 Per replay-semantics.md: ReplayEngine deterministically re-executes a recorded
 ExecutionTrace, producing bit-identical replay of the original execution.
-Used for debugging learned policies, reproducing failures, and validating implementations.
+
+A genuine replay does NOT compare the trace to itself. Instead the engine drives
+a FRESH runtime (same seed, same graph, same recorded provider responses) through
+the control loop and compares the decisions and module-invocation sequence it
+actually re-derives against the recorded trace. Because the runtime re-derives
+every decision from its own DecisionPolicy, a deviation means the replay is not
+deterministic (or the trace was tampered), not that the engine echoed the input.
 """
 
 from __future__ import annotations
@@ -12,7 +18,6 @@ from typing import List, Optional
 
 from dnc.execution.execution_trace import (
     ExecutionTrace,
-    ExecutionRecord,
     TerminationReason,
 )
 
@@ -21,8 +26,6 @@ from dnc.execution.execution_trace import (
 class ReplayConfig:
     """Configuration for replay execution (per replay-semantics.md)."""
 
-    use_recorded_timestamps: bool = True
-    use_recorded_provider_responses: bool = True
     verify_determinism: bool = True
     stop_on_deviation: bool = True
     max_steps: Optional[int] = None
@@ -49,6 +52,7 @@ class ReplayResult:
     all_matched: bool
     step_results: List[ReplayStepResult] = field(default_factory=list)
     deviations: List[str] = field(default_factory=list)
+    replayed_module_sequence: List[str] = field(default_factory=list)
     termination_reason: Optional[TerminationReason] = None
 
     @property
@@ -69,14 +73,39 @@ class ReplayEngine:
     def replay(
         self,
         trace: ExecutionTrace,
+        runtime: "object",
+        es: "object",
+        response_map: dict,
         config: Optional[ReplayConfig] = None,
     ) -> ReplayResult:
-        """Replay a full execution trace and return the replay result."""
+        """Re-execute `trace` on a FRESH runtime and compare against the recording.
+
+        Args:
+            trace:        the recorded ExecutionTrace to replay.
+            runtime:      a freshly-constructed, identically-initialized Runtime
+                          (same seed, same graph) as the original execution.
+            es:           the fresh ExecutionState held by `runtime`.
+            response_map: mapping module_type_id (str) -> recorded output, used as
+                          the provider/module response for each node during replay.
+            config:       optional ReplayConfig.
+
+        The engine drives `runtime` step-for-step in lockstep with the trace,
+        re-deriving each decision from the runtime's own DecisionPolicy and
+        comparing it to the recorded decision. This is a real re-execution, not a
+        self-comparison.
+        """
+        from dnc.runtime.runtime import Observation, ExecutionState2
+
         self._config = config or ReplayConfig()
-        self._current_step = 0
+        if not self.verify_trace_integrity(trace):
+            raise ValueError("Trace missing required fields for replay")
+
+        # Bind the recorded responses as the dispatch output for each node.
+        runtime.set_dispatch_fn(lambda mid: response_map[str(mid.type_id)])
 
         step_results: List[ReplayStepResult] = []
         deviations: List[str] = []
+        replayed_module_sequence: List[str] = []
 
         total_steps = len(trace.execution_record)
         max_steps = total_steps
@@ -84,18 +113,45 @@ class ReplayEngine:
             max_steps = min(max_steps, self._config.max_steps)
 
         for i, record in enumerate(trace.execution_record):
-            if max_steps is not None and i >= max_steps:
+            if i >= max_steps:
                 break
 
-            step_result = self.replay_step(trace, i)
-            step_results.append(step_result)
+            obs = Observation(signals=list(record.observation.raw_signals))
+            fresh = runtime.decide(obs, es)
+            fresh_name = fresh.name if hasattr(fresh, "name") else str(fresh)
+            recorded = record.decision.decision
 
-            if not step_result.matched and self._config.verify_determinism:
-                deviations.append(
-                    f"Step {step_result.step_index}: {step_result.deviation_reason}"
+            matched = (fresh_name == recorded)
+            deviation_reason = None
+            if not matched:
+                deviation_reason = (
+                    f"decision mismatch: recorded={recorded}, replay={fresh_name}"
                 )
+
+            step_results.append(
+                ReplayStepResult(
+                    step_index=i,
+                    matched=matched,
+                    deviation_reason=deviation_reason,
+                    recorded_decision=recorded,
+                    replay_decision=fresh_name,
+                )
+            )
+            if not matched:
+                deviations.append(f"Step {i}: {deviation_reason}")
                 if self._config.stop_on_deviation:
                     break
+
+            dispatched = runtime.act(fresh, es)
+            for mid in dispatched:
+                replayed_module_sequence.append(str(mid.type_id))
+
+            # Mirror Runtime.step(): a TERMINATE decision ends the execution.
+            if fresh_name == "TERMINATE":
+                runtime._state = ExecutionState2.TERMINATED
+
+            if runtime.state == ExecutionState2.TERMINATED:
+                break
 
         all_matched = all(r.matched for r in step_results)
 
@@ -106,6 +162,7 @@ class ReplayEngine:
             all_matched=all_matched,
             step_results=step_results,
             deviations=deviations,
+            replayed_module_sequence=replayed_module_sequence,
             termination_reason=trace.termination_reason,
         )
 
@@ -113,16 +170,20 @@ class ReplayEngine:
         self,
         trace: ExecutionTrace,
         step_index: int,
+        runtime: "object",
+        es: "object",
+        response_map: Optional[dict] = None,
+        config: Optional[ReplayConfig] = None,
     ) -> ReplayStepResult:
-        """Replay a single step from the trace.
+        """Re-derive and compare the decision for a single recorded step.
 
-        In the reference implementation, replay_step verifies that the decision
-        recorded in the trace matches the decision that would be made by the
-        reference RulePolicy with the same inputs.
-
-        For provider responses, the ReplayEngine uses the pre-recorded responses
-        from the trace (per INV-REP-3) rather than making fresh calls.
+        Unlike the original (no-op) implementation, this genuinely invokes the
+        runtime's DecisionPolicy on the recorded observation and compares the
+        re-derived decision to the recorded one.
         """
+        from dnc.runtime.runtime import Observation
+
+        self._config = config or ReplayConfig()
         if step_index >= len(trace.execution_record):
             return ReplayStepResult(
                 step_index=step_index,
@@ -131,39 +192,23 @@ class ReplayEngine:
             )
 
         record = trace.execution_record[step_index]
-        recorded_decision = record.decision.decision
-
-        if self._config is None or not self._config.verify_determinism:
-            return ReplayStepResult(
-                step_index=step_index,
-                matched=True,
-                recorded_decision=recorded_decision,
-                replay_decision=recorded_decision,
-            )
-
-        replay_decision = self._replay_decision(record)
-
-        matched = self._decisions_match(recorded_decision, replay_decision)
+        obs = Observation(signals=list(record.observation.raw_signals))
+        fresh = runtime.decide(obs, es)
+        fresh_name = fresh.name if hasattr(fresh, "name") else str(fresh)
+        recorded = record.decision.decision
+        matched = fresh_name == recorded
         deviation_reason = None
         if not matched:
             deviation_reason = (
-                f"Decision mismatch: recorded={recorded_decision}, "
-                f"replay={replay_decision}"
+                f"decision mismatch: recorded={recorded}, replay={fresh_name}"
             )
-
         return ReplayStepResult(
             step_index=step_index,
             matched=matched,
             deviation_reason=deviation_reason,
-            recorded_decision=recorded_decision,
-            replay_decision=replay_decision,
+            recorded_decision=recorded,
+            replay_decision=fresh_name,
         )
-
-    def _replay_decision(self, record: ExecutionRecord) -> str:
-        return record.decision.decision
-
-    def _decisions_match(self, recorded: str, replay: str) -> bool:
-        return recorded == replay
 
     def verify_trace_integrity(self, trace: ExecutionTrace) -> bool:
         """Verify that a trace has the required fields for replay."""
