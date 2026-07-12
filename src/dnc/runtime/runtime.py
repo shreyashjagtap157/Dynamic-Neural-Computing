@@ -25,7 +25,7 @@ from dnc.state.checkpoint import Checkpoint, CheckpointRecord
 from dnc.state.registry import ModuleRegistry
 from dnc.scheduler.scheduler import Scheduler
 from dnc.planner.pipeline import (
-    Planner,
+    LinearGraphPlanner,
     PlanningTask,
     ExecutionGraph,
     ReplanContext,
@@ -213,7 +213,7 @@ class Runtime:
         self._config.validate()
 
         self._registry = ModuleRegistry()
-        self._planner = Planner()
+        self._planner = LinearGraphPlanner()
         self._cost_budget = CostBudget(total_budget=initial_budget)
         self._cost_forecaster = CostForecaster(self._cost_budget)
         self._staged_checkpoint = StagedCheckpointBudget(self._cost_budget)

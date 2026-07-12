@@ -1,9 +1,14 @@
-"""Planner: synthesizes execution graphs at runtime.
+"""LinearGraphPlanner: synthesizes execution graphs at runtime.
 
 Per planner-pipeline.md DEF-PLANNER-1 through DEF-PLANNER-7:
 - Four phases: Task Analysis, Module Selection, Graph Construction, Validation
 - Produces SUCCESS(G) or FAIL(reason)
 - Complexity bounded per INV-PLANNER-10: O(|V|²) worst case
+
+The implementation is a single linear synthesis pass over the module
+registry; it does NOT learn or retrain modules. It is named LinearGraphPlanner
+to avoid implying learned/general planning. `Planner` is retained as a
+backward-compatible alias.
 """
 
 from __future__ import annotations
@@ -257,7 +262,7 @@ class GraphValidator:
         return None
 
 
-class Planner:
+class LinearGraphPlanner:
     """Main planner implementing DEF-PLANNER-2 four-phase pipeline.
 
     Per INV-PLANNER-10: each phase complexity-bounded.
@@ -317,3 +322,8 @@ class Planner:
                 pass
 
         return retained, retired_early, new_only
+
+
+# Backward-compatible alias. The class is a single linear synthesis pass, not a
+# learned/general planner; prefer LinearGraphPlanner in new code.
+Planner = LinearGraphPlanner

@@ -1,7 +1,7 @@
 """Planner package."""
 
 from dnc.planner.pipeline import (
-    Planner,
+    LinearGraphPlanner,
     PlanningTask,
     PlanningResult,
     SubGoal,
@@ -14,8 +14,10 @@ from dnc.planner.pipeline import (
     GraphValidator,
     PlanningResultKind,
 )
+from dnc.planner.pipeline import Planner  # backward-compatible alias
 
 __all__ = [
+    "LinearGraphPlanner",
     "Planner",
     "PlanningTask",
     "PlanningResult",

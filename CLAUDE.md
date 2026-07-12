@@ -131,6 +131,18 @@ passes.
 | ACD-003 | state-management.md §3.C (ROLLBACK path) | ✅ RESOLVED | `Runtime._rollback_to_checkpoint` implemented (was undefined → AttributeError); restores ES(t) from latest checkpoint in place, deep-isolated, C(t) history retained. Closed by `tests/conformance/runtime/test_rollback.py` (P1). |
 | ACD-004 | architecture.md §2.F (provider binding) + replay-semantics.md | ✅ RESOLVED | `ReplayEngine` now genuinely re-drives a fresh runtime (no self-compare); `Runtime` binds `ExecutionProvider` at dispatch time with `ProviderMode` DEV/PROD (PROD fails loudly when unbound); `OllamaProvider.is_available` real reachability probe; `OpenAIProvider` real retry/backoff. Closed by `tests/conformance/replay/test_replay.py`, `tests/conformance/providers/test_provider_dispatch.py` (P1). |
 
+## Runtime Is an Orchestration Engine (not a trainer)
+
+Per the Architecture Conformance audit, the DNC runtime is a neural-computation
+**orchestration** engine: it synthesizes an execution graph (a structural
+analogy to a neural circuit) and dispatches module instances through the
+Observe → Decide → Act → Assess control loop. It does NOT train, learn, or
+retrain module weights — the `LinearGraphPlanner` (a single linear synthesis
+pass; `Planner` retained as a backward-compatible alias) only composes and
+schedules pre-existing module computations. Continual learning (Phase 3 /
+layer-6-evolution) operates on the knowledge base and drift bounds, not on
+module weight updates performed by the runtime.
+
 ## Specification State Machine
 
 Documents progress through: Draft → Review → Frozen → Amended → Superseded → Archived
