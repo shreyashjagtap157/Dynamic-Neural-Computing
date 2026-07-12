@@ -389,7 +389,6 @@ def test_ec20_coordinator_config_passed_through():
 def test_ec21_partition_detection_via_retry_count():
     """EC-21: retry_count increments for partition detection per INV-DIST-3."""
     coordinator = DistributedCoordinator(node_id="node_A")
-    receiver = IdempotentReceiver()
 
     msg = coordinator.initiate_handoff(
         sender_node_id="node_A",

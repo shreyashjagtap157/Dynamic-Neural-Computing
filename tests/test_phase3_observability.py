@@ -4,7 +4,6 @@ Tests provenance model, failure taxonomy, evaluation suite, and continual learni
 """
 
 import sys
-import math
 sys.path.insert(0, 'src')
 
 from dnc.observability.provenance import (
@@ -12,40 +11,24 @@ from dnc.observability.provenance import (
     ProvenanceEvent,
     EventType,
     ProvenanceTamperingViolation,
-    CausalChainBroken,
 )
 from dnc.observability.failure import (
     FailureClassifier,
-    FailureHandler,
-    AlertManager,
-    FailureClassification,
     FailureSignal,
-    FailureRecord,
-    AlertSeverity,
     SIGNAL_TO_CLASSIFICATION,
 )
 from dnc.observability.evaluation import (
     EvaluationSuite,
     EvaluationScenario,
     EvaluationRun,
-    EvaluationStage,
     MetricResult,
     MetricClass,
     ResultClassification,
-    NovelTaskBenchmark,
-    get_canonical_novel_benchmarks,
 )
 from dnc.learning.continual import (
     KnowledgeBase,
-    LearningEvent,
     DriftChecker,
     ExecutionRecord,
-    LearningVerificationProtocol,
-    RollbackCircuitBreaker,
-    RootCauseRollback,
-    CandidateUpdate,
-    DriftBoundExceeded,
-    CatastrophicForgettingDetected,
 )
 
 
@@ -81,7 +64,7 @@ class TestPhase3ExitCriteria:
         pl = ProvenanceLog("exec_3")
         e0 = pl.append(EventType.MODULE_REGISTERED, None, None, {"module": "A"})
         e1 = pl.append(EventType.STEP_DISPATCHED, 1, e0.event_id, {"step": 1})
-        e2 = pl.append(EventType.STEP_COMPLETED, 2, e1.event_id, {"step": 1})
+        pl.append(EventType.STEP_COMPLETED, 2, e1.event_id, {"step": 1})
 
         assert pl.verify_chain() is True
 
@@ -230,9 +213,8 @@ class TestPhase3ExitCriteria:
         ]
         dr._representative_sample = {0}
 
-        v0 = dr._history[0].metric_vector
         v_prime = [0.8, 0.7, 0.9]
-        drift0 = dr.compute_drift(0, v_prime)
+        dr.compute_drift(0, v_prime)
 
         is_within, violations = dr.is_within_drift_bound([0.8, 0.7, 0.9], DRIFT_BOUND)
         assert is_within is True, f"Identical vectors should have 0 drift, got violations: {violations}"
@@ -279,7 +261,6 @@ class TestPhase3ExitCriteria:
 
         assert kb.kb_version == 3
 
-        prior_modules = dict(kb.KB_modules)
         kb.rollback_to(1)
         assert kb.kb_version == 1
         assert "mod_v0" in kb.KB_modules

@@ -67,7 +67,6 @@ def process_file(filepath: str, filename: str, layer: str):
     with open(filepath, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    original_content = content
     lines = content.split('\n')
     updated_lines = []
     updated = False
@@ -143,8 +142,6 @@ def verify_pr4_compliance():
 
 def verify_rfc2119_compliance():
     """Verify every normative statement has an RFC 2119 keyword."""
-    RFC2119_KEYWORDS = {'MUST', 'SHALL', 'MUST NOT', 'SHOULD', 'MAY', 'SHOULD NOT', 'REQUIRED', 'RECOMMENDED', 'NOT RECOMMENDED'}
-
     normative_violations = []
     docs_scanned = 0
 

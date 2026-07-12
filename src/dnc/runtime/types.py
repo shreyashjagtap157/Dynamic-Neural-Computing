@@ -7,16 +7,31 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, FrozenSet, Optional
 
 
+_DNC_INSTANCE_NAMESPACE = uuid.UUID("d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f90")
+
+
 class ModuleInstanceID:
     """Unique identifier for a module instance within an execution.
 
     Per state-management.md: each registered module instance has exactly one
     ModuleInstanceID, and no two instances share the same ID within an execution.
+
+    When ``instance_counter`` is provided the UUID is derived deterministically
+    from ``(type_id, instance_counter)``. This makes a planner that reuses the
+    same role across a replan emit the same ModuleInstanceID, so RETAINED nodes
+    (per replanning-protocol.md INV-REPLAN-10 / INV-STATE-7) are recognised as
+    the same instance and their working-memory state is preserved byte-exact.
+    When ``instance_counter`` is omitted a fresh random UUID is used.
     """
 
     def __init__(self, type_id: str, instance_counter: Optional[int] = None) -> None:
         self._type_id = type_id
-        self._instance_uuid = uuid.uuid4()
+        if instance_counter is None:
+            self._instance_uuid = uuid.uuid4()
+        else:
+            self._instance_uuid = uuid.uuid5(
+                _DNC_INSTANCE_NAMESPACE, f"{type_id}:{instance_counter}"
+            )
 
     @property
     def type_id(self) -> str:

@@ -12,7 +12,6 @@ sys.path.insert(0, "src")
 
 from dnc.invariants.verifier import (
     BootstrapVerifier,
-    BootstrapVerificationReport,
     VerificationResult,
     VerificationStatus,
 )

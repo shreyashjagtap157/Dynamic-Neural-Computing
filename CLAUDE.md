@@ -5,7 +5,7 @@
 This is the Dynamic Neural Computation (DNC) specification project — a formal specification for researching and developing dynamic neural computing systems, with a Python implementation of Phase 1 through Phase 7.
 
 **Specification Version**: 0.1.0 (Baseline v1.0)
-**Implementation Version**: 0.1.0 (Phase 1–7 complete, 130/130 tests passing)
+**Implementation Version**: 0.1.0 (Phase 1–7 complete, 134/134 tests passing)
 
 ## Project Status
 
@@ -115,7 +115,7 @@ python tools/fix_refs.py --rfc2119
 | G-12.4 RNG state in ES(t) | ✅ RESOLVED | R(t) added to execution record |
 | G-12.1 cross-file DEF-3 vs DEF-FM-11 | ✅ RESOLVED | INV-REPLAN-9 and INV-STATE-2 both reference DEF-FM-11 |
 | G-12.3 INV-8 bootstrapping | ✅ RESOLVED | BootstrapVerifier implemented in src/dnc/invariants/verifier.py; check_invariants() verifies all 7 runtime invariants at bootstrap |
-| G-12.2 byte-exact memory | ⚠️ OPEN | Acceptable as implementation constraint |
+| G-12.2 byte-exact memory | ✅ RESOLVED | ModuleInstanceID now deterministic on (type_id, instance_counter), so the planner reuses IDs across replans and RETAINED nodes actually exist; byte-exact preservation verified by tests/test_g12_byte_exact.py (planner ID reuse, RETAINED W byte-equality, checkpoint restore byte-equality) |
 
 ## Specification State Machine
 

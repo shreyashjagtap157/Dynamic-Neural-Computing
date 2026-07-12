@@ -8,13 +8,10 @@ import sys
 sys.path.insert(0, 'src')
 
 from dnc.runtime.types import (
-    UNBOUND,
-    PENDING,
     Buffer,
     ModuleInstanceID,
     ModuleTypeID,
     ModuleContract,
-    DAGCycle,
 )
 from dnc.state.execution_state import ExecutionState
 from dnc.state.working_memory import WorkingMemory

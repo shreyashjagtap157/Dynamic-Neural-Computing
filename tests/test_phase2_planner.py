@@ -8,8 +8,6 @@ import time
 sys.path.insert(0, 'src')
 
 from dnc.runtime.types import (
-    UNBOUND,
-    PENDING,
     Buffer,
     ModuleInstanceID,
     ModuleTypeID,
@@ -17,20 +15,18 @@ from dnc.runtime.types import (
 )
 from dnc.state.execution_state import ExecutionState
 from dnc.state.working_memory import WorkingMemory, HistoryLog
-from dnc.state.checkpoint import Checkpoint, CheckpointRecord
+from dnc.state.checkpoint import CheckpointRecord
 from dnc.state.registry import ModuleRegistry
 from dnc.scheduler.scheduler import Scheduler
 from dnc.planner.pipeline import (
     Planner,
     PlanningTask,
     ExecutionGraph,
-    ReplanContext,
 )
 from dnc.cost.semantics import CostBudget, CostForecaster
 from dnc.runtime.runtime import (
     Runtime,
     Decision,
-    AssessmentKind,
     ExecutionState2,
     LatencyConfig,
 )
@@ -161,7 +157,6 @@ class TestPhase2ExitCriteria:
 
         assert mid_b in retired_early, "mid_b should be RETIRED_EARLY"
 
-        from dnc.state.working_memory import HistoryLog
         hl = HistoryLog()
         for mid in retired_early:
             hl.append("RETIRED_EARLY", mid, wm[mid].output, None, "replan_trigger")
@@ -273,7 +268,6 @@ class TestPhase2ExitCriteria:
 
     def test_ec7_cost_forecast_triggers_replan(self):
         """EC-7: Cost forecast triggers replan before resource exhaustion (INV-REPLAN-4)."""
-        from dnc.cost.semantics import CostBudget, CostForecaster
 
         budget = CostBudget(total_budget=100.0)
         forecaster = CostForecaster(budget)

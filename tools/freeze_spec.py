@@ -39,7 +39,7 @@ def freeze_file(filepath: Path, dry_run: bool = False) -> list:
     else:
         pass
 
-    old_state = f"| State | Draft |"
+    old_state = "| State | Draft |"
     new_state = "| State | Frozen |"
     if old_state in new_content:
         new_content = new_content.replace(old_state, new_state)

@@ -18,18 +18,15 @@ sys.path.insert(0, "src")
 
 from dnc.observability.bias_evaluation import (
     BiasEvaluationFramework,
-    BiasEvaluationResult,
     BiasViolationException,
     GroupedPredictions,
     dp_a_rate,
     dp_b_rate,
-    tpr_fpr,
 )
 from dnc.observability.evaluation import (
     EvaluationSuite,
     EvaluationRun,
     ResultClassification,
-    MetricClass,
 )
 from dnc.runtime.runtime import (
     RegressionMonitor,

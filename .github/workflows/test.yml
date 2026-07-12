@@ -29,7 +29,7 @@ jobs:
         run: python -m pip install --upgrade pip ruff
 
       - name: Lint
-        run: python -m ruff check src/
+        run: python -m ruff check src/ tests/ tools/
 
       - name: Run Phase 1 Exit Criteria
         run: python tests/phase1_exit_criteria.py
@@ -60,6 +60,9 @@ jobs:
 
       - name: Run Phase 7 Distributed Tests
         run: python tests/test_phase7_distributed.py
+
+      - name: Run G-12.2 Byte-Exact Preservation Tests
+        run: python tests/test_g12_byte_exact.py
 
       - name: Verify tool / fix_refs
         run: python tools/fix_refs.py --verify
