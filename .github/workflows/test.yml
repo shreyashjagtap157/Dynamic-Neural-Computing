@@ -1,0 +1,83 @@
+name: DNC Test Suite
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    name: Run test suite (${{ matrix.python-version }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip ruff
+
+      - name: Lint
+        run: python -m ruff check src/
+
+      - name: Run Phase 1 Exit Criteria
+        run: python tests/phase1_exit_criteria.py
+
+      - name: Run Integration Tests
+        run: python tests/test_integration.py
+
+      - name: Run Invariant Violation Tests
+        run: python tests/test_invariant_violations.py
+
+      - name: Run Invariant Verifier Tests
+        run: python tests/test_invariant_verifier.py
+
+      - name: Run Phase 2 Planner Tests
+        run: python tests/test_phase2_planner.py
+
+      - name: Run Phase 3 Observability Tests
+        run: python tests/test_phase3_observability.py
+
+      - name: Run Phase 4 Production Tests
+        run: python tests/test_phase4_production.py
+
+      - name: Run Phase 5B Reference Runtime Tests
+        run: python tests/test_phase5b.py
+
+      - name: Run Phase 5C/5D/5E Provider Tests
+        run: python tests/test_phase5_providers.py
+
+      - name: Run Phase 7 Distributed Tests
+        run: python tests/test_phase7_distributed.py
+
+      - name: Verify tool / fix_refs
+        run: python tools/fix_refs.py --verify
+
+  spec-review:
+    name: Spec tools (fix_refs, RFC 2119)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: PR-4 Layer compliance check
+        run: python tools/fix_refs.py --verify
+
+      - name: RFC 2119 keyword discipline check
+        run: python tools/fix_refs.py --rfc2119
