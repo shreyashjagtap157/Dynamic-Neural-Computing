@@ -204,6 +204,13 @@ class RulePolicy(DecisionPolicy):
         pending = getattr(es, "pending_count", None)
         if pending is None:
             return False
+        # An execution with zero registered module instances is "nothing to do
+        # yet", not "everything done" — otherwise a bare ES(t) would terminate
+        # immediately. Only terminate once modules exist AND all are complete.
+        wm = getattr(es, "W", None)
+        total = len(wm) if wm is not None else 0
+        if total == 0:
+            return False
         return pending == 0
 
     def _is_step_deadline_missed(self, es: ExecutionState) -> bool:

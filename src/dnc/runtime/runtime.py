@@ -33,6 +33,13 @@ from dnc.cost.semantics import CostBudget, CostForecaster, StagedCheckpointBudge
 from dnc.invariants.runtime_invariants import check_invariants
 
 
+def _is_output_bound(buf: object) -> bool:
+    """True if a module's output has already been produced (not UNBOUND/PENDING)."""
+    if buf is None:
+        return False
+    return not isinstance(getattr(buf, "output", None), (UNBOUND, PENDING))
+
+
 class ExecutionState2(Enum):
     """Runtime execution states (per control-loop.md)."""
     INIT = auto()
@@ -271,9 +278,16 @@ class Runtime:
 
         Delegates to RulePolicy per Phase 5 architecture. Cost forecaster
         and replan count are handled by RulePolicy internally.
+
+        ACD-001: the runtime propagates live execution-control state onto ES(t)
+        (pending_count, budget_remaining) so the DecisionPolicy's rules
+        (terminate when complete, replan when exhausted) are actually
+        evaluated instead of inert.
         """
         if self._state != ExecutionState2.RUNNING:
             return Decision.TERMINATE
+
+        es.budget_remaining = self._cost_budget.remaining
 
         self._rule_policy.set_observation(obs)
         self._rule_policy.set_execution_state(es)
@@ -305,7 +319,15 @@ class Runtime:
         if decision == Decision.CONTINUE and es.G:
             sched: Scheduler = es.G
             runnable = sched.get_runnable(es.W)
-            for mid in runnable:
+            # ACD-001 completion guard: get_runnable reports nodes whose
+            # UPSTREAM preconditions are met (per INV-3); it intentionally
+            # still lists already-completed nodes. The runtime must not
+            # re-dispatch a node whose output is already bound, otherwise the
+            # control loop would re-execute finished work forever.
+            to_dispatch = [
+                mid for mid in runnable if not _is_output_bound(es.W[mid])
+            ]
+            for mid in to_dispatch:
                 if self._backpressure_active():
                     break
                 if self._module_dispatch_fn:
@@ -356,7 +378,7 @@ class Runtime:
 
         self._replan_count += 1
 
-        ck = Checkpoint.take(es.step_index, es.execution_id, es.to_dict(), "PRE_REPLAN")
+        ck = Checkpoint.take(es.step_index, es.execution_id, es.copy().to_dict(), "PRE_REPLAN")
         ck.validate()
         es.C.add(ck)
 

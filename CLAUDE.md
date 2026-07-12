@@ -5,7 +5,7 @@
 This is the Dynamic Neural Computation (DNC) specification project — a formal specification for researching and developing dynamic neural computing systems, with a Python implementation of Phase 1 through Phase 7.
 
 **Specification Version**: 0.1.0 (Baseline v1.0)
-**Implementation Version**: 0.1.0 (Phase 1–7 complete, 134/134 tests passing)
+**Implementation Version**: 0.1.0 (Phase 1–7 complete, 139/139 tests passing)
 
 ## Project Status
 
@@ -116,6 +116,18 @@ python tools/fix_refs.py --rfc2119
 | G-12.1 cross-file DEF-3 vs DEF-FM-11 | ✅ RESOLVED | INV-REPLAN-9 and INV-STATE-2 both reference DEF-FM-11 |
 | G-12.3 INV-8 bootstrapping | ✅ RESOLVED | BootstrapVerifier implemented in src/dnc/invariants/verifier.py; check_invariants() verifies all 7 runtime invariants at bootstrap |
 | G-12.2 byte-exact memory | ✅ RESOLVED | ModuleInstanceID now deterministic on (type_id, instance_counter), so the planner reuses IDs across replans and RETAINED nodes actually exist; byte-exact preservation verified by tests/test_g12_byte_exact.py (planner ID reuse, RETAINED W byte-equality, checkpoint restore byte-equality) |
+
+## Architecture Conformance Defects (ACD)
+
+Remediation tracking for the exhaustive runtime-vs-Architecture-v1.0 conformance audit
+(remediation plan approved with P0A→P0B→Review gate→P1→P2 structure). Each ACD links a
+violating INV-* and is closed only when an executable conformance test in `tests/conformance/`
+passes.
+
+| ACD | Violates | Status | Resolution |
+|-----|----------|--------|------------|
+| ACD-001 | INV-RT-3 (control loop termination) | ✅ RESOLVED (P0A) | `ExecutionState.pending_count` added; `Runtime.decide` propagates `budget_remaining`; `Runtime.act` completion guard filters already-output-bound nodes; `RulePolicy._is_all_modules_complete` requires a non-empty module set so a bare ES(t) does not terminate prematurely. Closed by `tests/conformance/runtime/test_control_loop.py`. |
+| ACD-002 | INV-RP-2 (checkpoint immutability / no aliasing) | ✅ RESOLVED (P0A) | `ExecutionState.from_dict` now deep-isolates W/M/C/H; `Runtime._execute_replan` snapshots via `es.copy()` so rollback cannot corrupt its own snapshot. Closed by `tests/conformance/runtime/test_replay_and_rollback.py`. |
 
 ## Specification State Machine
 

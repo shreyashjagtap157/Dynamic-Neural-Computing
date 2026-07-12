@@ -2,7 +2,7 @@
 
 A formal specification and Python implementation for researching and developing dynamic neural computing systems.
 
-**Specification**: Baseline v1.0 (Frozen) | **Implementation**: 130 tests passing | **Lint**: clean
+**Specification**: Baseline v1.0 (Frozen) | **Implementation**: 139 tests passing | **Lint**: clean
 
 ## Quick Start
 
@@ -106,7 +106,7 @@ Formal docs in `specs/`:
 | Phase 5D | 17 | ComputationMonitor with DCI, CCG, Budget Elasticity, Graph Entropy... |
 | Phase 7 | 22 | DistributedCoordinator, IdempotentReceiver, partition handling, single-hop |
 
-**Total: 130 tests passing**
+**Total: 139 tests passing**
 
 ## Dependencies
 

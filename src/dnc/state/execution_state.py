@@ -8,6 +8,8 @@ import uuid
 
 from dnc.runtime.types import (
     StateComponentViolation,
+    UNBOUND,
+    PENDING,
 )
 from dnc.state.working_memory import WorkingMemory, HistoryLog
 from dnc.state.checkpoint import CheckpointRecord
@@ -69,6 +71,23 @@ class ExecutionState:
         return self._execution_id
 
     @property
+    def pending_count(self) -> int:
+        """Number of registered module instances whose output is not yet bound.
+
+        Drives natural control-loop termination: when pending_count reaches 0
+        every node in the execution graph has produced an output, so the
+        DecisionPolicy may TERMINATE. Per ACD-001 this makes the runtime own
+        execution instead of infinitely re-dispatching.
+        """
+        if self.W is None:
+            return 0
+        return sum(
+            1
+            for _mid, buf in self.W.items()
+            if isinstance(buf.output, (UNBOUND, PENDING))
+        )
+
+    @property
     def R(self) -> int:
         """RNG state. Deterministic per formal-model.md DEF-FM-2."""
         return self._rng_state
@@ -104,12 +123,23 @@ class ExecutionState:
 
     @classmethod
     def from_dict(cls, data: dict) -> "ExecutionState":
-        """Deserialize ES(t) from a checkpoint snapshot."""
+        """Deserialize ES(t) from a checkpoint snapshot.
+
+        Per ACD-002 (INV-RP-2): the restored state MUST be a deep-isolated copy.
+        The original ES(t) and the restored ES'(t) must NOT share mutable
+        working-memory / checkpoint / history objects, otherwise a checkpoint
+        would alias live state and rollback could corrupt its own snapshot.
+        """
         es = cls()
-        es.W = data.get("W", WorkingMemory())
-        es.M = data.get("M", {})
-        es.C = data.get("C", CheckpointRecord())
-        es.H = data.get("H", HistoryLog())
+        wm_src = data.get("W")
+        es.W = wm_src.copy() if wm_src is not None else WorkingMemory()
+        es.M = dict(data.get("M")) if data.get("M") else {}
+        cr_src = data.get("C")
+        es.C = CheckpointRecord()
+        if cr_src is not None:
+            es.C._checkpoints = list(cr_src._checkpoints)
+        hl_src = data.get("H")
+        es.H = hl_src.copy() if hl_src is not None else HistoryLog()
         es._step_index = data.get("step_index", 0)
         es._execution_id = data.get("execution_id", str(uuid.uuid4()))
         es._rng_state = data.get("rng_state", 0)
