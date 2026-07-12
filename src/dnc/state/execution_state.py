@@ -109,12 +109,20 @@ class ExecutionState:
         self._execution_id = exec_id
 
     def to_dict(self) -> dict:
-        """Serialize ES(t) for checkpointing per DEF-FM-11."""
+        """Serialize ES(t) for checkpointing per DEF-FM-11.
+
+        Per ACD-002 (INV-STATE-4): the snapshot MUST be a deep-isolated copy so
+        that once a checkpoint is taken it is immutable — subsequent mutations
+        to the live ES(t) cannot alter the recorded snapshot.
+        """
+        cr = CheckpointRecord()
+        if self.C:
+            cr._checkpoints = list(self.C._checkpoints)
         return {
-            "W": self.W,
-            "M": self.M,
-            "C": self.C,
-            "H": self.H,
+            "W": self.W.copy() if self.W else WorkingMemory(),
+            "M": dict(self.M) if self.M else {},
+            "C": cr,
+            "H": self.H.copy() if self.H else HistoryLog(),
             "step_index": self._step_index,
             "execution_id": self._execution_id,
             "rng_state": self._rng_state,

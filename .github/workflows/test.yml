@@ -64,6 +64,12 @@ jobs:
       - name: Run G-12.2 Byte-Exact Preservation Tests
         run: python tests/test_g12_byte_exact.py
 
+      - name: Run Conformance - ACD-001 Control Loop Termination (INV-CTRL-11)
+        run: python tests/conformance/runtime/test_control_loop.py
+
+      - name: Run Conformance - ACD-002 Checkpoint Immutability (INV-STATE-4)
+        run: python tests/conformance/runtime/test_replay_and_rollback.py
+
       - name: Verify tool / fix_refs
         run: python tools/fix_refs.py --verify
 

@@ -126,8 +126,8 @@ passes.
 
 | ACD | Violates | Status | Resolution |
 |-----|----------|--------|------------|
-| ACD-001 | INV-RT-3 (control loop termination) | ✅ RESOLVED (P0A) | `ExecutionState.pending_count` added; `Runtime.decide` propagates `budget_remaining`; `Runtime.act` completion guard filters already-output-bound nodes; `RulePolicy._is_all_modules_complete` requires a non-empty module set so a bare ES(t) does not terminate prematurely. Closed by `tests/conformance/runtime/test_control_loop.py`. |
-| ACD-002 | INV-RP-2 (checkpoint immutability / no aliasing) | ✅ RESOLVED (P0A) | `ExecutionState.from_dict` now deep-isolates W/M/C/H; `Runtime._execute_replan` snapshots via `es.copy()` so rollback cannot corrupt its own snapshot. Closed by `tests/conformance/runtime/test_replay_and_rollback.py`. |
+| ACD-001 | INV-CTRL-11 (loop termination conditions) | ✅ RESOLVED | `ExecutionState.pending_count` added; `Runtime.decide` propagates `budget_remaining`; `Runtime.act` completion guard filters already-output-bound nodes; `RulePolicy._is_all_modules_complete` requires a non-empty module set so a bare ES(t) does not terminate prematurely. Closed by `tests/conformance/runtime/test_control_loop.py` (P0B). |
+| ACD-002 | INV-STATE-4 (checkpoint immutability / no aliasing) | ✅ RESOLVED | `ExecutionState.to_dict` now deep-isolates W/M/C/H at capture time; `ExecutionState.from_dict` deep-isolates on restore; `Runtime._execute_replan` snapshots via `es.copy()`. Closed by `tests/conformance/runtime/test_replay_and_rollback.py` (P0B). |
 
 ## Specification State Machine
 
