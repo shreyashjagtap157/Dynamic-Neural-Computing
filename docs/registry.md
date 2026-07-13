@@ -73,3 +73,4 @@ Draft → Review → Frozen → Amended → Superseded → Archived
 |---|---|---|---|---|
 | DIST-AMEND-001 | SPEC-DIST | 2026-07-12 | Baseline v1.0: resolved open issues INV-DIST-3/4/5/6 | No |
 | FRZ-001 | All spec docs | 2026-07-12 | Frozen to Baseline v1.0 via tools/freeze_spec.py | No |
+| ARCH-AMEND-002 | SPEC-ARCH | 2026-07-13 | Baseline v1.1: reference runtime declared conformant with Architecture v1.0 (ACD-001..ACD-004 resolved, closed by tests/conformance/). Conformance report artifact at docs/conformance-report.md. | No |

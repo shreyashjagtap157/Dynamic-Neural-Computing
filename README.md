@@ -2,7 +2,9 @@
 
 A formal specification and Python implementation for researching and developing dynamic neural computing systems.
 
-**Specification**: Baseline v1.0 (Frozen) | **Implementation**: 154 tests passing | **Lint**: clean
+**Specification**: Baseline v1.0 (Frozen) | **Reference Runtime**: Baseline v1.1 (Conformant) | **Implementation**: 154 tests passing | **Lint**: clean
+
+The reference runtime conforms to Architecture v1.0 (Architecture Conformance Review PASSED; report at `docs/conformance-report.md`). The runtime is a neural-computation **orchestration** engine: it synthesizes an execution graph and dispatches module instances through the Observe → Decide → Act → Assess control loop. It does **not** train module weights.
 
 ## Quick Start
 

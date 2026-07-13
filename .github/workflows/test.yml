@@ -79,6 +79,9 @@ jobs:
       - name: Run Conformance - ACD-004 Deterministic Replay (replay-semantics)
         run: python tests/conformance/replay/test_replay.py
 
+      - name: Architecture Conformance Report gate (--check)
+        run: python tools/generate_conformance_report.py --check
+
       - name: Verify tool / fix_refs
         run: python tools/fix_refs.py --verify
 
