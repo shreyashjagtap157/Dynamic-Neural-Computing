@@ -1,0 +1,32 @@
+# Auto-detect text files and normalize line endings
+* text=auto
+
+# Python files must use LF line endings
+*.py text eol=lf
+
+# Explicitly binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.whl binary
+
+# Text files that should keep their line endings
+*.md text
+*.txt text
+*.rst text
+*.json text
+*.yml text
+*.yaml text
+*.toml text
+*.cfg text
+*.ini text
+*.bat text eol=crlf
+
+# Shell scripts - force LF for cross-platform compatibility
+*.sh text eol=lf

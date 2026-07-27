@@ -1,0 +1,1 @@
+import sys; sys.path.insert(0,'src'); exec(open('tests/conformance/test_execution_invariants.py').read()); t=TestExecutionInvariant(); [print(f'PASS: {n}') if not (lambda e: (print(f'FAIL: {n}: {e}') or False))(getattr(t,n)()) else None for n in sorted(dir(t)) if n.startswith('test_')]
