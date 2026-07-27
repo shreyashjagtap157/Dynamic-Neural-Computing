@@ -17,8 +17,12 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from dnc.observability.provenance import ProvenanceLog, EventType
-from dnc.observability.evaluation import EvaluationSuite, EvaluationStage
+from dnc.observability.provenance import (
+    EventType,
+    ProvenanceLog,
+    ProvenanceTamperingViolation as ProvenanceTamperingViolation,
+)
+from dnc.observability.evaluation import EvaluationSuite
 
 
 class DriftBoundExceeded(Exception):
@@ -288,7 +292,7 @@ class LearningVerificationProtocol:
             self._kb.rollback_to(self._kb.kb_version - 1)
             raise DriftBoundExceeded(f"Drift bound exceeded: {violations}")
 
-        new_version = self._kb.commit()
+        self._kb.commit()
         return True
 
     def _simulation_step(
@@ -298,7 +302,7 @@ class LearningVerificationProtocol:
         evaluation_suite: EvaluationSuite,
     ) -> bool:
         """Per INV-CL-8 Step 1: simulate candidate update against diverse sample."""
-        diverse_sample = self._build_diverse_sample(le_batch)
+        self._build_diverse_sample(le_batch)
         return True
 
     def _build_diverse_sample(

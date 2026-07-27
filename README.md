@@ -2,40 +2,24 @@
 
 A formal specification and Python implementation for researching and developing dynamic neural computing systems.
 
-**Specification**: Baseline v1.0 (Frozen) | **Implementation**: 130 tests passing | **Lint**: clean
+> [!WARNING]
+> **Current maturity: conformant research platform.** The implemented architecture
+> and complete test suite pass their current gates; empirical state-of-the-art,
+> enterprise operations, and end-to-end tensor-native neural execution remain roadmap work. A
+> portable neural contract and optional PyTorch adapter now provide the first backend foundation. See
+> the [current status](docs/project/REPOSITORY-STATUS.md) for verified results.
 
 ## Quick Start
 
 ```bash
-# Run all tests
-python tests/phase1_exit_criteria.py
-python tests/test_integration.py
-python tests/test_invariant_violations.py
-python tests/test_invariant_verifier.py
-python tests/test_phase2_planner.py
-python tests/test_phase3_observability.py
-python tests/test_phase4_production.py
-python tests/test_phase5b.py
-python tests/test_phase5_providers.py
-python tests/test_phase7_distributed.py
+# Install the package and development tools
+python -m pip install -e '.[dev]'
 
-# Or run all at once
-python -c "
-import subprocess
-tests=['phase1_exit_criteria.py','test_integration.py','test_invariant_violations.py',
-      'test_invariant_verifier.py','test_phase2_planner.py','test_phase3_observability.py',
-      'test_phase4_production.py','test_phase5b.py','test_phase5_providers.py','test_phase7_distributed.py']
-for t in tests:
-    r=subprocess.run(['python','tests/'+t],capture_output=True,text=True)
-    lines=[l for l in r.stdout.splitlines() if '/' in l and ('passed' in l or 'PASS' in l)]
-    print(lines[-1] if lines else t+' FAILED')
-"
+# Run the authoritative test suite
+pytest
 
 # Lint
 python -m ruff check src/
-
-# Verify spec (PR-4 compliance)
-python tools/fix_refs.py --verify
 
 # Freeze spec (Draft -> Baseline)
 python tools/freeze_spec.py
@@ -91,7 +75,8 @@ Formal docs in `specs/`:
 
 **Spec freeze tool**: `tools/freeze_spec.py` — batch-updates all Draft DR-* docs to Baseline v1.0/Frozen.
 
-**Spec verification**: `python tools/fix_refs.py --verify` (PR-4 lower-layers-only rule) and `--rfc2119` (RFC 2119 keyword discipline).
+Specification references and normative invariant wording are validated with
+`python tools/fix_refs.py --verify` and `python tools/fix_refs.py --rfc2119`.
 
 ## Implementation Phases
 
@@ -106,12 +91,19 @@ Formal docs in `specs/`:
 | Phase 5D | 17 | ComputationMonitor with DCI, CCG, Budget Elasticity, Graph Entropy... |
 | Phase 7 | 22 | DistributedCoordinator, IdempotentReceiver, partition handling, single-hop |
 
-**Total: 130 tests passing**
+These historical phase counts describe intended scope, not the current test
+result. Consult the generated CI result and the
+[repository status](docs/project/REPOSITORY-STATUS.md).
 
 ## Dependencies
 
-```bash
-pip install ruff  # linting
-```
+The core currently has no mandatory third-party runtime dependency. Development
+dependencies and optional future backend integrations are declared through
+`pyproject.toml` extras.
 
-No other runtime dependencies — pure Python standard library.
+## Project records and roadmap
+
+- [Documentation index](docs/README.md)
+- [Current status](docs/project/REPOSITORY-STATUS.md)
+- [User questions and research assessments](docs/research/USER-QUESTIONS-AND-ASSESSMENTS.md)
+- [Enterprise platform roadmap](docs/roadmap/ENTERPRISE-PLATFORM-ROADMAP.md)

@@ -20,7 +20,7 @@ import hashlib
 import json
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Set
 
@@ -201,7 +201,6 @@ class DistributedCoordinator:
         Per INV-DIST-2: atomic handoff — ACK only sent after successful processing.
         """
         if receiver.is_duplicate(message.message_id):
-            cached = receiver.get_cached_result(message.message_id)
             return self._make_ack(message, already_processed=True)
 
         if message.message_type == HandoffMessageType.STATE_TRANSFER:

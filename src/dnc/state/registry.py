@@ -4,7 +4,7 @@ Per state-management.md DEF-3: M(t) is the registry tracking all module type
 declarations, capability annotations, and version constraints.
 """
 
-from typing import Dict, FrozenSet, Optional
+from typing import Any, Dict, Optional
 
 from dnc.runtime.types import ModuleTypeID, ModuleContract
 
@@ -21,8 +21,14 @@ class ModuleRegistry:
         self._contracts: Dict[ModuleTypeID, ModuleContract] = {}
         self._type_id_index: Dict[str, ModuleTypeID] = {}
 
-    def register(self, contract: ModuleContract) -> None:
+    def register(self, contract: ModuleContract | str, implementation: Any = None) -> None:
         """Register a module contract. Raises ValueError if type_id already has a contract."""
+        if isinstance(contract, str):
+            contract = ModuleContract(
+                module_type_id=ModuleTypeID(contract, f"compat:{contract}"),
+                output_signature=object,
+                metadata={"implementation": implementation},
+            )
         type_id = contract.module_type_id
         if type_id in self._contracts:
             raise ValueError(

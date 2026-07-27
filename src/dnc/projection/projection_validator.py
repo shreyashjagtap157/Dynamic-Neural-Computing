@@ -3,7 +3,6 @@ Projection Validator (DNC Projection Layer)
 Validates ExecutableDAG readiness for the Execution Core.
 """
 
-from typing import List
 from .executable_graph import ExecutableDAG
 
 class ProjectionValidator:

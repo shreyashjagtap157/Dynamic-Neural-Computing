@@ -6,14 +6,11 @@ Reference implementation demonstrating learned knowledge changes future structur
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
 from dnc.ir.graph import StructuralGraph
-from dnc.ir.operations import IROperation, OperationType
-from dnc.ir.identity import UnitID
-from dnc.ir.unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension
 from dnc.dcc.computation_generator import ComputationGenerator, GenerationObjective, GenerationContext
-from dnc.dcc.structural_controller import StructuralController, EvaluationContext, EvaluationCriteria
-from dnc.dcc.learning_engine import LearningEngine, PredictionTracker, DeterministicLearningPolicy
+from dnc.dcc.structural_controller import StructuralController, EvaluationContext
+from dnc.dcc.learning_engine import PredictionTracker, DeterministicLearningPolicy
 from dnc.dcc.learning_engine import PredictionRecord, AdaptationKnowledgeBase, GeneratorInfluence
-from dnc.dcc.assessment_engine import Assessment, ExecutionResult, AdaptationKnowledge
+from dnc.dcc.assessment_engine import Assessment, ExecutionResult
 from dnc.dcc.dcc_contracts import MutationProposal, AuthorizationDecision
 
 @dataclass

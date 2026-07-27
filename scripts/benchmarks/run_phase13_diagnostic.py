@@ -10,10 +10,7 @@ This exposes:
 - Whether overhead causes measurable quality regression
 """
 
-import sys
-import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from dnc.evaluation.runner import BenchmarkRunner
 

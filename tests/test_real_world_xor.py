@@ -52,7 +52,7 @@ def sigmoid(z: float) -> float:
 # o  = sigmoid(15*h1 - 15*h2 - 7)        # ~1 when (OR and not AND) == XOR
 W_HIDDEN = {
     "L1A": ([10.0, 10.0], -5.0),
-    "L1B": ([10.0, 10.0], -30.0),
+    "L1B": ([10.0, 10.0], -15.0),
 }
 W_OUT = ([15.0, -15.0], -7.0)
 
@@ -163,7 +163,9 @@ class TestRealWorldNeuralCompute:
         return out
 
     def _reset_intermediates(self) -> None:
-        for name in ["L1A", "L1B", "L2", "DEC"]:
+        # Each sample is a new execution input; reset the source as well as all
+        # derived nodes so the completion guard does not reuse the prior sample.
+        for name in ["SRC", "L1A", "L1B", "L2", "DEC"]:
             self.es.W[self.mids[name]] = Buffer.unbound_input()
 
     def _run_sample(self, x1: float, x2: float) -> int:

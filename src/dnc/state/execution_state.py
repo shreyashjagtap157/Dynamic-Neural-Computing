@@ -3,20 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
-import random
+from typing import Dict, Optional, Any
 import uuid
+import copy
 
 from dnc.runtime.types import (
-    Buffer,
-    UNBOUND,
-    PENDING,
-    ModuleInstanceID,
     StateComponentViolation,
-    InvalidCheckpoint,
 )
 from dnc.state.working_memory import WorkingMemory, HistoryLog
-from dnc.state.checkpoint import Checkpoint, CheckpointRecord
+from dnc.state.checkpoint import CheckpointRecord
 
 
 @dataclass
@@ -60,6 +55,17 @@ class ExecutionState:
     C: Optional[CheckpointRecord] = field(default_factory=CheckpointRecord)
     H: Optional[HistoryLog] = field(default_factory=HistoryLog)
     G: Optional[Any] = field(default=None)  # Execution graph G = (V, E, w)
+    _budget_remaining: float = 1.0
+
+    @property
+    def budget_remaining(self) -> float:
+        return self._budget_remaining
+
+    @property
+    def pending_count(self) -> int:
+        if not self.W or len(self.W) == 0:
+            return 1
+        return sum(1 for mid in self.W if not self.W.is_complete(mid))
 
     @property
     def step_index(self) -> int:
@@ -112,14 +118,15 @@ class ExecutionState:
     def from_dict(cls, data: dict) -> "ExecutionState":
         """Deserialize ES(t) from a checkpoint snapshot."""
         es = cls()
-        es.W = data.get("W", WorkingMemory())
-        es.M = data.get("M", {})
-        es.C = data.get("C", CheckpointRecord())
-        es.H = data.get("H", HistoryLog())
+        es.W = copy.deepcopy(data.get("W", WorkingMemory()))
+        es.M = copy.deepcopy(data.get("M", {}))
+        es.C = copy.deepcopy(data.get("C", CheckpointRecord()))
+        es.H = copy.deepcopy(data.get("H", HistoryLog()))
         es._step_index = data.get("step_index", 0)
         es._execution_id = data.get("execution_id", str(uuid.uuid4()))
         es._rng_state = data.get("rng_state", 0)
         es.G = data.get("G")
+        es._budget_remaining = data.get("budget_remaining", 1.0)
         es._validate_components()
         return es
 

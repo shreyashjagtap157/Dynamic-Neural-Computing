@@ -80,7 +80,7 @@ def _build_linear_runtime() -> tuple[Runtime, ExecutionState, dict]:
     return runtime, es, mids
 
 
-def _dispatch_with_counts(mids: dict, counts: dict):
+def _dispatch_with_counts(es: ExecutionState, mids: dict, counts: dict):
     """Return a dispatch fn that tracks per-node invocation counts."""
 
     def _dispatch(mid: ModuleInstanceID):
@@ -90,17 +90,14 @@ def _dispatch_with_counts(mids: dict, counts: dict):
             return [1.0, 2.0]
         if name == "TR":
             upstream = mids["SRC"]
-            val = es_ref.W[upstream].output  # type: ignore[name-defined]
+            val = es.W[upstream].output
             return val[0] * 2 + val[1] * 2
         if name == "SINK":
             upstream = mids["TR"]
-            return es_ref.W[upstream].output  # type: ignore[name-defined]
+            return es.W[upstream].output
         raise ValueError(f"unknown node {name}")
 
     return _dispatch
-
-
-es_ref = None  # populated per-test so the closure can read live state
 
 
 class TestControlLoopTermination:
@@ -108,10 +105,9 @@ class TestControlLoopTermination:
 
     def test_loop_reaches_terminate_and_terminated_state(self):
         """The loop must reach TERMINATE and the runtime must enter TERMINATED."""
-        global es_ref
         runtime, es, mids = _build_linear_runtime()
         counts: dict = {}
-        runtime.set_dispatch_fn(_dispatch_with_counts(mids, counts))
+        runtime.set_dispatch_fn(_dispatch_with_counts(es, mids, counts))
 
         reached_terminate = False
         for _ in range(50):
@@ -131,10 +127,9 @@ class TestControlLoopTermination:
 
     def test_no_module_is_reexecuted(self):
         """ACD-001 completion guard: each module is dispatched exactly once."""
-        global es_ref
         runtime, es, mids = _build_linear_runtime()
         counts: dict = {}
-        runtime.set_dispatch_fn(_dispatch_with_counts(mids, counts))
+        runtime.set_dispatch_fn(_dispatch_with_counts(es, mids, counts))
 
         for _ in range(50):
             runtime.step(es)
@@ -154,10 +149,9 @@ class TestControlLoopTermination:
 
     def test_termination_is_not_infinite_loop(self):
         """The loop must terminate within a bounded number of iterations."""
-        global es_ref
         runtime, es, mids = _build_linear_runtime()
         counts: dict = {}
-        runtime.set_dispatch_fn(_dispatch_with_counts(mids, counts))
+        runtime.set_dispatch_fn(_dispatch_with_counts(es, mids, counts))
 
         steps = 0
         max_steps = 50

@@ -10,11 +10,12 @@ that are trivially unnecessary given the current graph state and observed histor
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple
-from dnc.ir.graph import StructuralGraph, Edge, EdgeType
+from enum import Enum
+from typing import List, Optional
+from dnc.ir.graph import StructuralGraph, EdgeType
 from dnc.ir.operations import IROperation, OperationType
 from dnc.ir.identity import UnitID, GraphID
-from dnc.ir.unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension, UnitContract, MutationContract
+from dnc.ir.unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension
 from dnc.dcc.dcc_contracts import MutationProposal
 
 
@@ -28,6 +29,18 @@ class GenerationObjective:
     max_edges: int = 20
     require_specialization: bool = False
     allow_composition: bool = True
+
+
+class NecessitySignal(str, Enum):
+    """Explicit evidence that may justify structural adaptation."""
+
+    OBJECTIVE_VIOLATION = "objective_violation"
+    CONSTRAINT_VIOLATION = "constraint_violation"
+    CAPACITY_INSUFFICIENCY = "capacity_insufficiency"
+    PERFORMANCE_DEGRADATION = "performance_degradation"
+    FAULT_RECOVERY_REQUIREMENT = "fault_recovery_requirement"
+    ENVIRONMENT_SHIFT = "environment_shift"
+    COMPOSITION_REQUIREMENT = "composition_requirement"
 
 
 @dataclass
@@ -45,6 +58,7 @@ class GenerationContext:
     recent_mutation_count: int = 0
     cycles_since_mutation: int = 999
     prior_mutation_harmed: bool = False
+    necessity_signals: frozenset[NecessitySignal] = field(default_factory=frozenset)
 
 
 class ComputationGenerator:
@@ -96,11 +110,32 @@ class ComputationGenerator:
         # DO NOT propose when: graph already has adequate capacity AND prior
         # utility is acceptable
         # ------------------------------------------------------------------
-        capacity_insufficient = (context.current_unit_count < context.objective.max_units // 2)
+        signals = context.necessity_signals
+        explicit_capacity_shortfall = NecessitySignal.CAPACITY_INSUFFICIENCY in signals
+        capacity_insufficient = context.current_unit_count < context.objective.max_units // 2
         prior_utility_poor = context.last_observed_utility < 0.70
         prior_mutation_failed = context.prior_mutation_harmed
         needs_bootstrap = graph_is_near_empty
-        needs_capacity = capacity_insufficient and (prior_utility_poor or prior_mutation_failed)
+        urgent_restructure = bool(
+            signals
+            & {
+                NecessitySignal.OBJECTIVE_VIOLATION,
+                NecessitySignal.CONSTRAINT_VIOLATION,
+                NecessitySignal.PERFORMANCE_DEGRADATION,
+                NecessitySignal.FAULT_RECOVERY_REQUIREMENT,
+                NecessitySignal.ENVIRONMENT_SHIFT,
+            }
+        )
+        needs_composition_capacity = (
+            NecessitySignal.COMPOSITION_REQUIREMENT in signals
+            and context.current_unit_count < 2
+        )
+        needs_capacity = (
+            explicit_capacity_shortfall
+            or needs_composition_capacity
+            or urgent_restructure
+            or (capacity_insufficient and (prior_utility_poor or prior_mutation_failed))
+        )
 
         if graph_has_capacity and (needs_bootstrap or needs_capacity):
             expansion_proposal = self._create_expansion_proposal(graph, context)
@@ -116,7 +151,11 @@ class ComputationGenerator:
         # ------------------------------------------------------------------
         if edges_have_capacity and len(graph.units) >= 2:
             graph_has_no_edges = context.current_edge_count == 0
-            prior_utility_degraded = context.last_observed_utility < 0.65
+            prior_utility_degraded = (
+                context.last_observed_utility < 0.65
+                or NecessitySignal.FAULT_RECOVERY_REQUIREMENT in signals
+                or NecessitySignal.ENVIRONMENT_SHIFT in signals
+            )
 
             if graph_has_no_edges or (prior_utility_degraded and not context.prior_mutation_harmed):
                 wiring_proposal = self._create_wiring_proposal(graph, context)
@@ -129,7 +168,10 @@ class ComputationGenerator:
         # The controller will evaluate marginal-value; the generator just proposes
         # when the objective requests it.
         # ------------------------------------------------------------------
-        if context.objective.require_specialization and len(graph.units) > 0:
+        if (
+            context.objective.require_specialization
+            or NecessitySignal.OBJECTIVE_VIOLATION in signals
+        ) and len(graph.units) > 0:
             specialization_proposal = self._create_specialization_proposal(graph, context)
             if specialization_proposal:
                 proposals.append(specialization_proposal)
@@ -139,9 +181,10 @@ class ComputationGenerator:
         # Propose when: allow_composition AND composable patterns AND
         #   (prior utility is poor OR prior mutation harmed) AND not in churn
         # ------------------------------------------------------------------
+        composition_required = NecessitySignal.COMPOSITION_REQUIREMENT in signals
         if context.objective.allow_composition and self._detect_composable_patterns(graph):
             prior_utility_low = context.last_observed_utility < 0.62
-            should_compose = prior_utility_low or context.prior_mutation_harmed
+            should_compose = prior_utility_low or context.prior_mutation_harmed or composition_required
             if should_compose and context.cycles_since_mutation > 3:
                 composition_proposal = self._create_composition_proposal(graph, context)
                 if composition_proposal:

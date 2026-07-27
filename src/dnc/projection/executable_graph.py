@@ -4,9 +4,8 @@ Defines the execution-oriented projection of a DNC-IR Structural Graph.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Set, Any
+from typing import Dict, List, Any
 from dnc.ir.identity import GraphID, GraphVersion, UnitID
-from dnc.ir.unit import ComputationalUnit
 
 @dataclass
 class ExecutableNode:

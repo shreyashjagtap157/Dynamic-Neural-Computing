@@ -7,7 +7,7 @@ import copy
 from typing import List, Tuple, Optional
 from dnc.ir.graph import StructuralGraph
 from dnc.ir.operations import IROperation
-from dnc.ir.validator import DNCIRValidator, ValidationResult
+from dnc.ir.validator import DNCIRValidator
 from dnc.mutation.engine import MutationEngine
 from dnc.ir.identity import TransactionID, GraphVersion
 from dnc.observability.provenance import ProvenanceLog, EventType

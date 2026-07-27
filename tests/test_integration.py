@@ -202,7 +202,7 @@ class TestSchedulerEdgeCases:
         # After src completes, xfrm becomes runnable
         wm[src] = Buffer.completed(None, 10)
         runnable2 = sched.get_runnable(wm)
-        assert src in runnable2
+        assert src not in runnable2  # completed nodes are never re-dispatched
         assert xfrm in runnable2
 
 

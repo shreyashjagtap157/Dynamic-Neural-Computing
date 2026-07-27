@@ -3,7 +3,7 @@ DNC Mutation Engine (Mutation Semantics & Transaction Semantics)
 Applies authorized structural operations to StructuralGraphs and records inverse compensation.
 """
 
-from typing import Tuple, List, Dict, Any, Optional
+from typing import Tuple, List, Optional
 from dnc.ir.graph import StructuralGraph, Edge, EdgeType
 from dnc.ir.operations import IROperation, OperationType
 from dnc.ir.unit import ComputationalUnit
@@ -16,7 +16,7 @@ class MutationEngine:
     and populating undo logs for rollback compensation.
     """
     def __init__(self, identity_registry: Optional[IdentityRegistry] = None):
-        self.identity_registry = identity_registry or IdentityRegistry()
+        self.identity_registry = identity_registry
 
     def apply_operation(self, graph: StructuralGraph, operation: IROperation) -> Tuple[bool, List[str], UndoLog]:
         undo_log = UndoLog()
@@ -28,7 +28,11 @@ class MutationEngine:
         try:
             if operation.op_type == OperationType.ADD_UNIT:
                 unit: ComputationalUnit = operation.parameters["unit"]
-                self.identity_registry.register_unit(unit.unit_id)
+                retired = set(graph.metadata.get("retired_unit_ids", []))
+                if unit.unit_id.value in retired:
+                    raise ValueError(
+                        f"Identity Violation: Retired UnitID {unit.unit_id} cannot be reused."
+                    )
                 graph.add_unit(unit)
                 # Inverse of ADD_UNIT is REMOVE_UNIT
                 undo_log.push(InverseOperation("REMOVE_UNIT", {"unit_id": unit.unit_id}))
@@ -42,7 +46,9 @@ class MutationEngine:
                 # Capture incident edges for inverse restoration
                 incident_edges = [e for e in graph.edges if e.source.value == uid_str or e.target.value == uid_str]
                 graph.remove_unit(unit_id)
-                self.identity_registry.retire_unit(unit_id)
+                retired = set(graph.metadata.get("retired_unit_ids", []))
+                retired.add(unit_id.value)
+                graph.metadata["retired_unit_ids"] = sorted(retired)
                 # Inverse of REMOVE_UNIT is ADD_UNIT + restoring edges
                 undo_log.push(InverseOperation("RESTORE_UNIT", {"unit": removed_unit, "edges": incident_edges}))
 

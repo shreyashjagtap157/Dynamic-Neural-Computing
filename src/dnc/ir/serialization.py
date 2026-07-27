@@ -40,7 +40,10 @@ class DNWIRSerializer:
                 "visibility": u.visibility.value,
                 "lifecycle": u.lifecycle.value,
                 "contract": asdict(u.contract),
-                "mutation_contract": asdict(u.mutation_contract),
+                "mutation_contract": {
+                    **asdict(u.mutation_contract),
+                    "allowed_mutations": sorted(u.mutation_contract.allowed_mutations),
+                },
                 "constraints": [asdict(c) for c in u.constraints],
                 "metadata": u.metadata,
                 "sub_units": [str(s) for s in u.sub_units]

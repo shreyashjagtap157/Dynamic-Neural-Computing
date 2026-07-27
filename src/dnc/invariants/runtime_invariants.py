@@ -7,18 +7,14 @@ on failure, halting execution per DEF-1.
 
 from __future__ import annotations
 
-from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
+from typing import Any, Optional
 
 from dnc.runtime.types import (
-    UNBOUND,
-    PENDING,
-    ModuleInstanceID,
     InvariantViolation,
-    DAGCycle,
+    StateComponentViolation,
 )
 from dnc.state.working_memory import WorkingMemory, HistoryLog
 from dnc.state.checkpoint import CheckpointRecord
-from dnc.scheduler.scheduler import Scheduler
 
 
 class RuntimeInvariantSet:
@@ -29,11 +25,19 @@ class RuntimeInvariantSet:
 
     def check_invariants(self, es: Any) -> None:
         """Check all runtime invariants. Raises InvariantViolation on failure."""
+        self._check_state_components(es)
         self._check_dag(es.W, es.G)
         self._check_working_memory(es.W)
         self._check_checkpoint_record(es.C)
         self._check_history_log(es.H)
         self._check_step_index(es._step_index)
+
+    def _check_state_components(self, es: Any) -> None:
+        for name in ("W", "M", "C", "H"):
+            if getattr(es, name, None) is None:
+                raise StateComponentViolation(
+                    f"INV-1: execution state component {name} is None"
+                )
 
     def _check_dag(self, wm: WorkingMemory, graph: Any) -> None:
         if graph is None:

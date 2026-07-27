@@ -3,7 +3,7 @@ Structural Graph to Executable DAG Projector (DNC Projection Layer)
 Implements deterministic lowering of a valid DNC-IR Structural Graph into an Executable DAG.
 """
 
-from typing import Tuple, List, Dict, Set
+from typing import Tuple, List, Dict
 from dnc.ir.graph import StructuralGraph, EdgeType
 from dnc.ir.validator import DNCIRValidator
 from .executable_graph import ExecutableDAG, ExecutableNode, ExecutableEdge

@@ -4,9 +4,7 @@ Implements inverse operations for structural rollback support.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
-from dnc.ir.identity import UnitID
-from dnc.ir.graph import Edge, EdgeType
+from typing import List, Dict, Any
 
 @dataclass
 class InverseOperation:

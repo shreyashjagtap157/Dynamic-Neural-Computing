@@ -3,9 +3,7 @@ DCCL Structural Controller — Minimal Deterministic Reference Implementation (P
 Implements rule-based authorization for DCCL interface verification.
 """
 
-from typing import Optional
 import uuid
-from dnc.ir.identity import TransactionID
 from .dcc_contracts import StructuralControllerInterface, MutationProposal, AuthorizationDecision
 
 class DeterministicStructuralController(StructuralControllerInterface):

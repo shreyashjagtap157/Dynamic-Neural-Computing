@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import time
-import uuid
+import copy
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from dnc.runtime.types import UNBOUND, PENDING, InvalidCheckpoint, StateComponentViolation
+from dnc.runtime.types import InvalidCheckpoint
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,7 @@ class Checkpoint:
             step_index=step_index,
             execution_id=execution_id,
             timestamp=time.time(),
-            es_snapshot=es_snapshot,
+            es_snapshot=copy.deepcopy(es_snapshot),
             provenance_ref=provenance_ref,
             is_valid=False,  # Must be validated before use
         )
@@ -55,7 +55,7 @@ class Checkpoint:
         # Condition 1: es_snapshot is complete
         if self.es_snapshot is None:
             raise InvalidCheckpoint(
-                f"Checkpoint validation failed: es_snapshot is None"
+                "Checkpoint validation failed: es_snapshot is None"
             )
 
         # Condition 3: step_index is non-negative integer
@@ -79,7 +79,7 @@ class Checkpoint:
         # Provenance ref should be non-empty string
         if not isinstance(self.provenance_ref, str):
             raise InvalidCheckpoint(
-                f"Checkpoint validation failed: provenance_ref is not a string"
+                "Checkpoint validation failed: provenance_ref is not a string"
             )
 
         # Mark as valid if all checks pass

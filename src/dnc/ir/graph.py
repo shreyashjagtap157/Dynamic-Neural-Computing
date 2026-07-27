@@ -5,7 +5,7 @@ Implements Structural Graph, Edge definitions, Graph versioning, and Executable 
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Set, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any
 from .identity import GraphID, GraphVersion, UnitID
 from .unit import ComputationalUnit
 
@@ -44,10 +44,9 @@ class StructuralGraph:
         self.edges = [e for e in self.edges if e.source.value != uid and e.target.value != uid]
 
     def add_edge(self, edge: Edge) -> None:
-        if edge.source.value not in self.units:
-            raise KeyError(f"Source UnitID {edge.source} not in graph.")
-        if edge.target.value not in self.units:
-            raise KeyError(f"Target UnitID {edge.target} not in graph.")
+        # StructuralGraph is an authoring representation and may temporarily be
+        # invalid. DNCIRValidator is the single authority that reports dangling
+        # endpoints before projection or transaction commit.
         self.edges.append(edge)
 
     def remove_edge(self, source: UnitID, target: UnitID, edge_type: Optional[EdgeType] = None) -> None:

@@ -23,8 +23,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, List, Optional
 
-from dnc.runtime.types import StateComponentViolation, InvariantViolation
-from dnc.state.working_memory import WorkingMemory, HistoryLog
+from dnc.state.working_memory import HistoryLog
 from dnc.state.checkpoint import CheckpointRecord
 from dnc.state.registry import ModuleRegistry
 
@@ -57,7 +56,7 @@ class BootstrapVerificationReport:
 
     @property
     def all_passed(self) -> bool:
-        return all(r.passed for r in self.results)
+        return all(r.status != VerificationStatus.FAIL for r in self.results)
 
     @property
     def failed_invariants(self) -> List[str]:

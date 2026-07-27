@@ -11,10 +11,9 @@ from __future__ import annotations
 import hashlib
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional, Set
 
-from dnc.runtime.types import ModuleInstanceID
 
 
 class ProvenanceTamperingViolation(Exception):

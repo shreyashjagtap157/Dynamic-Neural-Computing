@@ -3,10 +3,7 @@ Phase 13 Pilot Experiment Runner (Phase 13C & 13D)
 Executes pilot subset W1, W2, W3, W6 with R=3 repetitions across all 7 systems (84 runs).
 """
 
-import sys
-import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from dnc.evaluation.runner import BenchmarkRunner
 

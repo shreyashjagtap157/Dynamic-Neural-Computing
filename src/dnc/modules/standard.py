@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, FrozenSet
+from typing import Any
 
-from dnc.modules.base import BaseModule, validate_contract
+from dnc.modules.base import BaseModule
 from dnc.runtime.types import (
-    Buffer,
     ModuleTypeID,
     ModuleContract,
-    UNBOUND,
     PENDING,
 )
 
@@ -54,6 +52,10 @@ class TransformModule(BaseModule):
 
     def observe(self, input_value: Any) -> Any:
         return self._transform_fn(input_value)
+
+
+# Compatibility name used by the DNC-IR projection integration surface.
+StandardModule = TransformModule
 
 
 class AggregateModule(BaseModule):

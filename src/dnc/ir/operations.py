@@ -5,7 +5,7 @@ Implements abstract mutation operation definitions.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 class OperationType(str, Enum):
     ADD_UNIT = "ADD_UNIT"

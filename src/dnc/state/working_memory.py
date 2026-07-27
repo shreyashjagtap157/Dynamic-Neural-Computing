@@ -3,14 +3,14 @@
 Per state-management.md DEF-2: immutable once written, no mutation in place.
 """
 
-from typing import Dict, Iterator, Mapping, Optional
+from collections.abc import ItemsView
+from typing import Dict, Iterator, Optional
 
 from dnc.runtime.types import (
     Buffer,
     ModuleInstanceID,
     UNBOUND,
     PENDING,
-    StateComponentViolation,
 )
 
 
@@ -43,8 +43,9 @@ class WorkingMemory:
     def __iter__(self) -> Iterator[ModuleInstanceID]:
         return iter(self._entries)
 
-    def items(self) -> Mapping[ModuleInstanceID, Buffer]:
-        return self._entries
+    def items(self) -> ItemsView[ModuleInstanceID, Buffer]:
+        """Return the conventional key/value view for this mapping."""
+        return self._entries.items()
 
     def get(self, instance_id: ModuleInstanceID) -> Optional[Buffer]:
         return self._entries.get(instance_id)
@@ -67,13 +68,16 @@ class WorkingMemory:
         return not isinstance(buf.input, UNBOUND)
 
     def is_complete(self, instance_id: ModuleInstanceID) -> bool:
-        """True if the module has produced output (not UNBOUND and not PENDING)."""
+        """True if the module has produced output (not UNBOUND and not PENDING).
+
+        Source modules legitimately have no bound input, so completion is an
+        output-state property rather than an input-state property.
+        """
         buf = self._entries.get(instance_id)
         if buf is None:
             return False
         return (
-            not isinstance(buf.input, UNBOUND)
-            and not isinstance(buf.output, UNBOUND)
+            not isinstance(buf.output, UNBOUND)
             and not isinstance(buf.output, PENDING)
         )
 
@@ -118,7 +122,7 @@ class HistoryLog:
         trigger_provenance_ref: Optional[str] = None,
     ) -> int:
         """Append a history log entry. Returns the assigned index."""
-        entry = {
+        entry = ImmutableHistoryEntry({
             "index": self._index_counter,
             "timestamp": 0.0,  # Set by clock in runtime
             "mutation_type": mutation_type,
@@ -126,7 +130,7 @@ class HistoryLog:
             "before_value": before_value,
             "after_value": after_value,
             "trigger_provenance_ref": trigger_provenance_ref,
-        }
+        })
         self._entries.append(entry)
         idx = self._index_counter
         self._index_counter += 1
@@ -151,3 +155,18 @@ class HistoryLog:
         hl._entries = list(self._entries)
         hl._index_counter = self._index_counter
         return hl
+
+
+class ImmutableHistoryEntry(dict):
+    """Dictionary-compatible, immutable history record."""
+
+    def _immutable(self, *args: object, **kwargs: object) -> None:
+        raise TypeError("history entries are immutable")
+
+    __setitem__ = _immutable
+    __delitem__ = _immutable
+    clear = _immutable
+    pop = _immutable
+    popitem = _immutable
+    setdefault = _immutable
+    update = _immutable

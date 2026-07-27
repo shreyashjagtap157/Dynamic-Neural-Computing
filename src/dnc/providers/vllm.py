@@ -7,7 +7,7 @@ vLLMProvider implements the ExecutionProvider interface for vLLM's OpenAI-compat
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, FrozenSet, Optional, Set
 
 from dnc.execution.execution_provider import (
@@ -206,7 +206,7 @@ class vLLMProvider(ExecutionProvider):
                         "model": model,
                     }
                 return {"embedding": [], "model": model}
-        except urllib.error.URLError as e:
+        except urllib.error.URLError:
             return {"embedding": [0.0] * 768, "model": model, "_mock": True}
 
     def _execute_generic(

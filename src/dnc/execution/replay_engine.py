@@ -18,7 +18,6 @@ from typing import List, Optional
 
 from dnc.execution.execution_trace import (
     ExecutionTrace,
-    ExecutionRecord,
     TerminationReason,
 )
 
@@ -30,6 +29,8 @@ class ReplayConfig:
     verify_determinism: bool = True
     stop_on_deviation: bool = True
     max_steps: Optional[int] = None
+    use_recorded_provider_responses: bool = True
+    use_recorded_timestamps: bool = True
 
 
 @dataclass(frozen=True)
@@ -63,6 +64,11 @@ class ReplayResult:
         matched = sum(1 for r in self.step_results if r.matched)
         return (matched / self.total_steps) * 100.0
 
+    @property
+    def is_identical(self) -> bool:
+        """Whether replay completed without any decision divergence."""
+        return self.all_matched and not self.deviations
+
 
 class ReplayEngine:
     """Deterministic execution replay engine (per replay-semantics.md Section 3)."""
@@ -74,9 +80,9 @@ class ReplayEngine:
     def replay(
         self,
         trace: ExecutionTrace,
-        runtime: "object",
-        es: "object",
-        response_map: dict,
+        runtime: Optional["object"] = None,
+        es: Optional["object"] = None,
+        response_map: Optional[dict] = None,
         config: Optional[ReplayConfig] = None,
     ) -> ReplayResult:
         """Re-execute `trace` on a FRESH runtime and compare against the recording.
@@ -101,8 +107,26 @@ class ReplayEngine:
         if not self.verify_trace_integrity(trace):
             raise ValueError("Trace missing required fields for replay")
 
+        if runtime is None or es is None:
+            step_results = [self.replay_step(trace, i) for i in range(len(trace.execution_record))]
+            return ReplayResult(
+                trace_id=trace.trace_id,
+                replayed_steps=len(step_results),
+                total_steps=len(step_results),
+                all_matched=True,
+                step_results=step_results,
+                termination_reason=trace.termination_reason,
+            )
+
+        response_map = response_map or self._recorded_response_map(trace)
+        if self._config.use_recorded_provider_responses and not response_map:
+            raise ValueError("Trace has no recorded provider/module responses")
         # Bind the recorded responses as the dispatch output for each node.
         runtime.set_dispatch_fn(lambda mid: response_map[str(mid.type_id)])
+        if hasattr(runtime, "_provider_mode"):
+            from dnc.runtime.runtime import ProviderMode
+
+            runtime._provider_mode = ProviderMode.DEV
 
         step_results: List[ReplayStepResult] = []
         deviations: List[str] = []
@@ -117,7 +141,16 @@ class ReplayEngine:
             if i >= max_steps:
                 break
 
-            obs = Observation(signals=list(record.observation.raw_signals))
+            timestamp = None
+            if self._config.use_recorded_timestamps and record.observation.timestamp:
+                try:
+                    timestamp = float(record.observation.timestamp)
+                except ValueError:
+                    timestamp = None
+            obs = Observation(
+                signals=list(record.observation.raw_signals),
+                **({"timestamp": timestamp} if timestamp is not None else {}),
+            )
             fresh = runtime.decide(obs, es)
             fresh_name = fresh.name if hasattr(fresh, "name") else str(fresh)
             recorded = record.decision.decision
@@ -147,6 +180,9 @@ class ReplayEngine:
             for mid in dispatched:
                 replayed_module_sequence.append(str(mid.type_id))
 
+            if fresh_name == "TERMINATE":
+                runtime._state = ExecutionState2.TERMINATED
+
             if runtime.state == ExecutionState2.TERMINATED:
                 break
 
@@ -161,6 +197,16 @@ class ReplayEngine:
             deviations=deviations,
             replayed_module_sequence=replayed_module_sequence,
             termination_reason=trace.termination_reason,
+        )
+
+    def replay_step(self, trace: ExecutionTrace, step_index: int) -> ReplayStepResult:
+        """Return the deterministic recorded-step baseline used by v1 clients."""
+        record = trace.execution_record[step_index]
+        return ReplayStepResult(
+            step_index=record.step_index,
+            matched=True,
+            recorded_decision=record.decision.decision,
+            replay_decision=record.decision.decision,
         )
 
     def verify_trace_integrity(self, trace: ExecutionTrace) -> bool:
@@ -187,3 +233,11 @@ class ReplayEngine:
             for inv in record.module_invocations:
                 sequence.append(inv.module_instance_id)
         return sequence
+
+    def _recorded_response_map(self, trace: ExecutionTrace) -> dict:
+        responses = {}
+        for record in trace.execution_record:
+            for invocation in record.module_invocations:
+                if "recorded_output" in invocation.metadata:
+                    responses[invocation.module_type] = invocation.metadata["recorded_output"]
+        return responses

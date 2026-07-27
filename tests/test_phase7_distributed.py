@@ -82,9 +82,9 @@ def test_ec3_idempotent_receiver_evicts_oldest_when_window_full():
         )
         receiver.record(msg, {"n": i})
 
-    assert receiver.is_duplicate("msg_000")
-    assert receiver.is_duplicate("msg_001")
-    assert not receiver.is_duplicate("msg_004")
+    assert not receiver.is_duplicate("msg_000")
+    assert not receiver.is_duplicate("msg_001")
+    assert receiver.is_duplicate("msg_004")
     print("PASS: ec3_idempotent_receiver_evicts_oldest_when_window_full")
 
 

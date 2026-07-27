@@ -4,7 +4,7 @@ Proves deterministic reconstruction of structural graph states from transaction 
 """
 
 import copy
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from dnc.ir.graph import StructuralGraph
 from dnc.ir.operations import IROperation
 from dnc.transaction.manager import TransactionManager

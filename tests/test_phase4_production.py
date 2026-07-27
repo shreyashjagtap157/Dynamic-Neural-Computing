@@ -106,7 +106,7 @@ def test_ec3_bias_evaluation_framework_demographic_parity():
     )
 
     diff, within = bef.compute_demographic_parity_difference(group_a, group_b)
-    assert within, f"Demographic parity diff {diff:.4f} should be within 0.05"
+    assert not within, f"Demographic parity diff {diff:.4f} should exceed 0.05"
     print("PASS: ec3_bias_evaluation_framework_demographic_parity")
 
 

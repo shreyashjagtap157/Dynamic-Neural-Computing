@@ -4,12 +4,12 @@ Bridges execution results back to DCCL adaptation decisions.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple, TYPE_CHECKING
 from dnc.ir.graph import StructuralGraph
-from dnc.ir.identity import GraphID, UnitID
-from dnc.dcc.dcc_contracts import MutationProposal, AuthorizationDecision
+from dnc.dcc.dcc_contracts import MutationProposal
+
+if TYPE_CHECKING:
+    from dnc.dcc.structural_controller import ProposalEvaluation
 
 @dataclass
 class ExecutionResult:
@@ -80,7 +80,8 @@ class AssessmentEngine:
         execution_result: ExecutionResult,
         proposal: MutationProposal,
         graph_before_version: str,
-        graph_after_version: str
+        graph_after_version: str,
+        baseline_utility: Optional[float] = None,
     ) -> Assessment:
         """
         Assess whether a proposal's execution produced the intended outcome.
@@ -88,7 +89,14 @@ class AssessmentEngine:
         self._assessment_counter += 1
 
         post_utility = execution_result.metrics.get("utility", 0.0)
-        improvement = post_utility - proposal.expected_utility
+        # Improvement is causal relative to preserving the prior structure's
+        # observed value. Prediction error is a different quantity and must not
+        # be fed back as evidence that the mutation harmed the system.
+        comparison_baseline = (
+            proposal.expected_utility if baseline_utility is None else baseline_utility
+        )
+        improvement = post_utility - comparison_baseline
+        prediction_error = post_utility - proposal.expected_utility
 
         return Assessment(
             assessment_id=f"assess_{self._assessment_counter}",
@@ -105,7 +113,9 @@ class AssessmentEngine:
             metadata={
                 "units_executed": execution_result.units_executed,
                 "edges_traversed": execution_result.edges_traversed,
-                "success": execution_result.success
+                "success": execution_result.success,
+                "baseline_utility": comparison_baseline,
+                "prediction_error": prediction_error,
             }
         )
 

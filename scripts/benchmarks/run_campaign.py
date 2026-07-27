@@ -4,22 +4,23 @@ Executes 1,680 runs (8 workloads x 7 configurations x 30 repetitions) and comput
 Adaptation Precision, Recall, F1, ΔV Calibration Error, Decision Regret, and Convergence Metrics (T_stable).
 """
 
-import sys
-import os
+import argparse
+import json
 import random
 import time
 import statistics
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Tuple
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import List, Dict, Any
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from dnc.evaluation.contracts import BenchmarkSystem, ExperimentResult
+from dnc.evaluation.contracts import ExperimentResult
 from dnc.evaluation.baselines.static_dag import StaticDAGSystem
 from dnc.evaluation.baselines.replanner import ReplannerSystem
 from dnc.evaluation.baselines.agentic_loop import AgenticLoopSystem
 from dnc.evaluation.baselines.dnc_variants import DNCVariantSystem
 from dnc.evaluation.workloads.taxonomy import WorkloadTaxonomy, CompositeEvaluator
+from dnc.evaluation.counterfactual import EvidenceValueEstimator, features_from_tasks
 
 
 @dataclass
@@ -40,6 +41,8 @@ class CounterfactualTelemetryRecord:
     decision: str
     oracle_necessary: bool
     regret: float
+    estimator_id: str
+    measurement_method: str = "paired_run_mutation_ablation"
 
 
 class CampaignOrchestrator:
@@ -57,6 +60,7 @@ class CampaignOrchestrator:
             "W6_RepeatedTasks", "W7_Composition", "W8_LongHorizon"
         ]
         self.telemetry_records: List[CounterfactualTelemetryRecord] = []
+        self.value_estimator = EvidenceValueEstimator()
 
     def _factory(self, sys_key: str):
         if sys_key == "StaticDAG":
@@ -76,11 +80,14 @@ class CampaignOrchestrator:
         raise KeyError(f"Unknown system {sys_key}")
 
     def run_campaign(self) -> Dict[str, Any]:
+        total_runs = len(self.workloads) * len(self.systems) * self.repetitions
         print("=" * 90)
-        print("  STARTING R=30 SENSITIVITY CAMPAIGN (1,680 EXPERIMENT RUNS)")
+        print(
+            f"  STARTING R={self.repetitions} SENSITIVITY CAMPAIGN "
+            f"({total_runs:,} EXPERIMENT RUNS)"
+        )
         print("=" * 90)
 
-        total_runs = len(self.workloads) * len(self.systems) * self.repetitions
         completed = 0
         start_time = time.time()
 
@@ -99,48 +106,12 @@ class CampaignOrchestrator:
                     sys_inst = self._factory(sys_key)
                     sys_inst.initialize(w_id, seed, {})
 
-                    units_before = 0
-                    if hasattr(sys_inst, "observe") and sys_inst.observe():
-                        units_before = sys_inst.observe().get("units", 0)
-
                     for t_in in task_inputs:
                         sys_inst.execute(t_in)
 
                     result = sys_inst.get_result()
                     result.task_quality = workload_def.ground_truth_evaluator(task_inputs, result, seed)
                     campaign_results[w_id][sys_key].append(result)
-
-                    # Simulate observational counterfactual telemetry for DNC variants
-                    if "DNC" in sys_key:
-                        oracle_nec = CompositeEvaluator.is_adaptation_necessary(w_id, task_inputs)
-                        mut_count = result.structural_mutations
-                        dec = "AUTHORIZE" if mut_count > 0 else "STABLE"
-                        v_cur = 0.75
-                        v_no = 0.73
-                        v_mut = 0.82 if mut_count > 0 else 0.72
-                        pred_dv = v_mut - v_no
-                        real_dv = (result.task_quality - 0.75)
-                        err = abs(real_dv - pred_dv)
-                        regret = (v_no - v_mut) if mut_count > 0 else 0.0
-
-                        self.telemetry_records.append(CounterfactualTelemetryRecord(
-                            run_id=result.experiment_id,
-                            workload_id=w_id,
-                            configuration=sys_key,
-                            replication_id=rep,
-                            cycle=result.execution_steps,
-                            unit_count_before=units_before,
-                            unit_count_after=units_before + mut_count,
-                            v_current=v_cur,
-                            v_no_op=v_no,
-                            v_mutation=v_mut,
-                            predicted_delta_v=pred_dv,
-                            realized_delta_v=real_dv,
-                            prediction_error=err,
-                            decision=dec,
-                            oracle_necessary=oracle_nec,
-                            regret=regret
-                        ))
 
                     sys_inst.shutdown()
                     completed += 1
@@ -152,7 +123,63 @@ class CampaignOrchestrator:
         print(f"  CAMPAIGN COMPLETE: {completed}/{total_runs} runs in {elapsed_sec:.1f}s")
         print("=" * 90)
 
+        self._measure_counterfactuals(campaign_results)
         return self.analyze_results(campaign_results)
+
+    def _measure_counterfactuals(
+        self, results: Dict[str, Dict[str, List[ExperimentResult]]]
+    ) -> None:
+        """Measure DNC-Full against its mutation-disabled paired execution.
+
+        DNC-Full and DNC-M use the same seed, tasks, evaluator, learning setting,
+        and initial graph. Their only intended capability difference is structural
+        mutation. This provides an observed run-level counterfactual; it is not
+        presented as a per-candidate causal estimate.
+        """
+        self.telemetry_records.clear()
+        for workload_id in self.workloads:
+            workload = WorkloadTaxonomy.get_workload(workload_id)
+            full_runs = results[workload_id]["DNC_Full"]
+            no_op_runs = results[workload_id]["DNC_M"]
+            for replication_id, (mutation_run, no_op_run) in enumerate(
+                zip(full_runs, no_op_runs, strict=True)
+            ):
+                seed = 42 + replication_id
+                tasks = workload.task_generator(seed)
+                features = features_from_tasks(
+                    workload_id,
+                    tasks,
+                    current_unit_count=int(mutation_run.metadata.get("initial_units", 0)),
+                    expected_mutation_cost=0.002 * max(1, len(tasks)),
+                )
+                prediction = self.value_estimator.predict(features)
+                realized_delta = mutation_run.task_quality - no_op_run.task_quality
+                mutated = mutation_run.structural_mutations > 0
+                chosen_value = mutation_run.task_quality if mutated else no_op_run.task_quality
+                best_value = max(mutation_run.task_quality, no_op_run.task_quality)
+                self.telemetry_records.append(
+                    CounterfactualTelemetryRecord(
+                        run_id=mutation_run.experiment_id,
+                        workload_id=workload_id,
+                        configuration="DNC_Full",
+                        replication_id=replication_id,
+                        cycle=mutation_run.execution_steps,
+                        unit_count_before=int(mutation_run.metadata.get("initial_units", 0)),
+                        unit_count_after=int(mutation_run.metadata.get("final_units", 0)),
+                        v_current=no_op_run.task_quality,
+                        v_no_op=no_op_run.task_quality,
+                        v_mutation=mutation_run.task_quality,
+                        predicted_delta_v=prediction.delta_v,
+                        realized_delta_v=realized_delta,
+                        prediction_error=abs(realized_delta - prediction.delta_v),
+                        decision="AUTHORIZE" if mutated else "STABLE",
+                        oracle_necessary=CompositeEvaluator.is_adaptation_necessary(
+                            workload_id, tasks
+                        ),
+                        regret=best_value - chosen_value,
+                        estimator_id=self.value_estimator.estimator_id,
+                    )
+                )
 
     def analyze_results(self, results: Dict[str, Dict[str, List[ExperimentResult]]]) -> Dict[str, Any]:
         analysis = {}
@@ -195,6 +222,21 @@ class CampaignOrchestrator:
             "RMSE_DeltaV": rmse_dv,
             "MeanRegret": mean_regret
         }
+        analysis["methodology"] = {
+            "repetitions": self.repetitions,
+            "seed_start": 42,
+            "estimator_id": self.value_estimator.estimator_id,
+            "realized_counterfactual": "paired DNC_Full minus DNC_M run-level quality",
+            "adaptivity_metric_scope": (
+                "metadata-label adherence; generator and oracle consume the same explicit signals"
+            ),
+            "causal_scope": (
+                "paired trajectory ablation, not a per-candidate randomized causal estimate"
+            ),
+            "benchmark_scope": (
+                "synthetic reference systems; results do not demonstrate external task utility"
+            ),
+        }
 
         # Workload-level summary
         workload_summary = {}
@@ -215,11 +257,36 @@ class CampaignOrchestrator:
 
 
 if __name__ == "__main__":
-    orchestrator = CampaignOrchestrator(repetitions=30)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--repetitions", type=int, default=30)
+    parser.add_argument("--out", type=Path, help="Write summary and telemetry as JSON")
+    args = parser.parse_args()
+    if args.repetitions < 1:
+        parser.error("--repetitions must be positive")
+
+    orchestrator = CampaignOrchestrator(repetitions=args.repetitions)
     report = orchestrator.run_campaign()
 
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(
+            json.dumps(
+                {
+                    "report": report,
+                    "telemetry": [asdict(record) for record in orchestrator.telemetry_records],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
     print("\n" + "#" * 90)
-    print("  PHASE 13C.5 / 13D.2 SENSITIVITY CAMPAIGN RESULTS (R=30)")
+    print(
+        "  PHASE 13C.5 / 13D.2 SENSITIVITY CAMPAIGN RESULTS "
+        f"(R={args.repetitions})"
+    )
     print("#" * 90)
 
     print("\n[Layer 2] Adaptation Precision & Recall (DNC_Full):")
