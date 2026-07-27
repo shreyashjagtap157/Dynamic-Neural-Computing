@@ -82,10 +82,10 @@ class CompositeEvaluator:
 
         # Adaptation bonus: reward systems that adapted when adaptation WAS necessary
         # (This is the key discriminative term: DNC should score higher when adaptation helps)
-        if adaptation_necessary:
+        if adaptation_necessary and structural_mutations > 0:
             if adaptation_events > 0:
-                quality += 0.05  # Bonus for successful adaptation
-            if structural_mutations > 0 and structural_mutations < 10:
+                quality += 0.05  # Learning-assisted structural adaptation
+            if structural_mutations < 10:
                 # Efficient adaptation: small number of targeted changes
                 quality += 0.03
             elif structural_mutations >= 10 and structural_mutations < 30:
@@ -97,11 +97,19 @@ class CompositeEvaluator:
     @staticmethod
     def is_adaptation_necessary(workload_id: str, task_inputs: List[Dict[str, Any]]) -> bool:
         """Determine if this workload genuinely requires structural adaptation."""
-        # W3 (FaultRecovery) and W5 (DistributionShift) require adaptation
+        # Necessity labels must agree with the per-workload evaluator.
         if "W3" in workload_id:
             return any(t.get("fault_injected", False) for t in task_inputs)
         if "W5" in workload_id:
             return any(t.get("shift", False) for t in task_inputs)
+        if "W4" in workload_id:
+            return any(
+                t.get("constraint_violation", False)
+                or ("budget" in t and t["budget"] < t.get("complexity", 0))
+                for t in task_inputs
+            )
+        if "W7" in workload_id:
+            return any(t.get("require_composition", False) for t in task_inputs)
         # W8 (LongHorizon) with faults requires adaptation
         if "W8" in workload_id:
             return any(t.get("fault_injected", False) for t in task_inputs)

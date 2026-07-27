@@ -86,6 +86,7 @@ def _run_and_record(runtime, es) -> tuple:
     """Run the control loop, recording (decision, dispatched, signals) per step."""
     steps = []
     response_map = {}
+    runtime.set_dispatch_fn(lambda mid: f"recorded:{mid.type_id}")
     for idx in range(50):
         obs = runtime.observe()
         d = runtime.decide(obs, es)

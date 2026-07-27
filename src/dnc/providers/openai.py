@@ -217,7 +217,7 @@ class OpenAIProvider(ExecutionProvider):
         else:
             return [{"role": "user", "content": str(input)}]
 
-    def _add_retry_logic(self, req: urllib.request.Request) -> None:
+    def _add_retry_logic(self, req: Any) -> None:
         pass
 
     def _estimate_tokens(self, input: Any, output: Any) -> int:

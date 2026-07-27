@@ -4,9 +4,7 @@ Verifies runner reproducibility, contract compliance, equivalent inputs, and bas
 """
 
 import sys
-import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from dnc.evaluation.contracts import ExperimentResult, BenchmarkSystem
 from dnc.evaluation.runner import BenchmarkRunner
@@ -33,7 +31,10 @@ def test_runner_reproducibility():
     assert len(res2) == 1
     assert res1[0].success == res2[0].success
     assert res1[0].task_quality == res2[0].task_quality
-    assert res1[0].latency_ms == res2[0].latency_ms
+    # Wall-clock latency is observational and cannot be byte-identical. The
+    # deterministic contract covers decisions, quality, cost, and structure.
+    assert res1[0].structural_mutations == res2[0].structural_mutations
+    assert res1[0].total_cost == res2[0].total_cost
     print("PASS: runner_reproducibility")
 
 

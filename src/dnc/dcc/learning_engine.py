@@ -4,11 +4,10 @@ Reference implementation of learning-from-observation without mutation authority
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple, Callable
-from collections import defaultdict
+from typing import List, Dict, Any, Optional, Tuple
 import statistics
 
-from dnc.dcc.assessment_engine import Assessment, AdaptationKnowledge, ExecutionResult
+from dnc.dcc.assessment_engine import Assessment
 from dnc.dcc.dcc_contracts import MutationProposal, AuthorizationDecision
 
 @dataclass

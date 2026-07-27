@@ -3,10 +3,7 @@ Phase 13 Full Pilot — All 8 Workloads (W1–W8)
 R=3 across all 7 systems = 168 experiment runs
 """
 
-import sys
-import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from dnc.evaluation.runner import BenchmarkRunner
 

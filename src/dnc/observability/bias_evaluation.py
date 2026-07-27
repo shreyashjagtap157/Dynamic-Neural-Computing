@@ -12,7 +12,7 @@ If any threshold is violated, the deployment or KB update is BLOCKED until bias 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 
 @dataclass(frozen=True)

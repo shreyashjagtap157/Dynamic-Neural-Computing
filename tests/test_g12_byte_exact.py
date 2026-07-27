@@ -168,7 +168,7 @@ class TestG12ByteExact:
         assert before_bytes == after_bytes, (
             "Runtime replan MUST preserve RETAINED node W byte-exact (G-12.2)."
         )
-        assert es.W[node].uuid == before_id, "RETAINED node identity must be stable"
+        assert node.uuid == before_id, "RETAINED node identity must be stable"
 
     def test_g122_checkpoint_restore_byte_exact(self):
         """Checkpoint restore via from_dict reproduces ES(t) byte-for-byte."""

@@ -3,7 +3,7 @@ DCCL Computation Generator — Minimal Deterministic Reference Implementation (P
 Implements rule-based structural proposal generation for interface verification.
 """
 
-from typing import List, Any, Dict
+from typing import List, Any
 import uuid
 from dnc.ir.operations import IROperation, OperationType
 from dnc.ir.identity import UnitID
@@ -30,7 +30,7 @@ class DeterministicComputationGenerator(ComputationGeneratorInterface):
                 target_graph_id=current_graph_state.graph_id.value,
                 candidate_operations=[
                     IROperation(OperationType.ADD_UNIT, {
-                        "unit": self._create_base_unit(u1, f"BaseUnit_1")
+                        "unit": self._create_base_unit(u1, "BaseUnit_1")
                     })
                 ],
                 rationale="Initial unit addition for empty graph",

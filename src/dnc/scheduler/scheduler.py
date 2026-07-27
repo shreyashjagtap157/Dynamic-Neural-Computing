@@ -8,15 +8,13 @@ Per execution-model.md and planner-pipeline.md:
 
 from __future__ import annotations
 
-import copy
-from typing import Callable, Dict, FrozenSet, Iterator, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from dnc.runtime.types import (
     Buffer,
     UNBOUND,
     PENDING,
     ModuleInstanceID,
-    InvariantViolation,
     DAGCycle,
 )
 from dnc.state.working_memory import WorkingMemory
@@ -47,8 +45,11 @@ class Scheduler:
     """
 
     def __init__(self) -> None:
-        self._graph: Dict[ModuleInstanceID, Set[ModuleInstanceID]] = {}
-        self._reverse: Dict[ModuleInstanceID, Set[ModuleInstanceID]] = {}
+        # Lists preserve construction order across deepcopy/pickle. Sets made
+        # otherwise identical checkpoints serialize differently, violating the
+        # byte-exact replay contract.
+        self._graph: Dict[ModuleInstanceID, List[ModuleInstanceID]] = {}
+        self._reverse: Dict[ModuleInstanceID, List[ModuleInstanceID]] = {}
         self._in_degree: Dict[ModuleInstanceID, int] = {}
         self._dispatch_order: Optional[List[ModuleInstanceID]] = None
 
@@ -61,8 +62,8 @@ class Scheduler:
 
         Edges are (upstream, downstream): upstream's output → downstream's input.
         """
-        self._graph = {n: set() for n in nodes}
-        self._reverse = {n: set() for n in nodes}
+        self._graph = {n: [] for n in nodes}
+        self._reverse = {n: [] for n in nodes}
         self._in_degree = {n: 0 for n in nodes}
 
         for upstream, downstream in edges:
@@ -70,9 +71,10 @@ class Scheduler:
                 raise ValueError(
                     f"Edge references unknown node: {upstream} -> {downstream}"
                 )
-            self._graph[upstream].add(downstream)
-            self._reverse[downstream].add(upstream)
-            self._in_degree[downstream] += 1
+            if downstream not in self._graph[upstream]:
+                self._graph[upstream].append(downstream)
+                self._reverse[downstream].append(upstream)
+                self._in_degree[downstream] += 1
 
         if self._has_cycle():
             self._graph = {}
@@ -133,6 +135,8 @@ class Scheduler:
         runnable: List[ModuleInstanceID] = []
 
         for node in order:
+            if wm.is_complete(node):
+                continue
             if not self._are_preconditions_met(node, wm):
                 continue
             runnable.append(node)
@@ -141,7 +145,7 @@ class Scheduler:
 
     def _are_preconditions_met(self, node: ModuleInstanceID, wm: WorkingMemory) -> bool:
         """Check if all upstream dependencies are complete for this node."""
-        upstreams = self._reverse.get(node, set())
+        upstreams = self._reverse.get(node, [])
         for upstream in upstreams:
             if upstream not in wm:
                 return False
@@ -162,7 +166,7 @@ class Scheduler:
 
         Returns the output value.
         """
-        upstreams = self._reverse.get(instance_id, set())
+        upstreams = self._reverse.get(instance_id, [])
         if upstreams:
             inputs = [wm.get_output(u) for u in sorted(upstreams, key=id)]
         else:

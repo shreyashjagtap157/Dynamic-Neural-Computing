@@ -5,11 +5,8 @@ Precisely diagnoses WHERE in the DNC pipeline the over-mutation failure occurs.
 For every cycle, records proposals generated, authorized, and operations per authorized proposal.
 """
 
-import sys
-import os
 import random
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from dnc.dcc.computation_generator import GenerationObjective
 from dnc.evaluation.workloads.taxonomy import WorkloadTaxonomy
@@ -92,7 +89,7 @@ def run_lifecycle_for_system(system_key, workload_id, base_seed=42):
                 "utility": utility,
             })
         else:
-            result = system.execute(task_input)
+            system.execute(task_input)
             cycle_log.append({
                 "cycle": len(cycle_log) + 1,
                 "authorized": True,
@@ -132,7 +129,7 @@ def print_lifecycle_table(cycle_log, workload_id, system_key, result):
         total_ops = sum(c["auth_ops"] for c in cycle_log)
         avg_ops_per_auth = total_ops / max(len(auth_cycles), 1)
 
-        print(f"\n  SUMMARY:")
+        print("\n  SUMMARY:")
         print(f"    Total proposals generated:  {total_props}")
         print(f"    Authorized cycles:           {len(auth_cycles)} / {len(cycle_log)}")
         print(f"    Total ops in authorized:     {total_ops}")
@@ -142,7 +139,7 @@ def print_lifecycle_table(cycle_log, workload_id, system_key, result):
 
         # Diagnosis
         if len(auth_cycles) == len(cycle_log):
-            print(f"  -> DIAG: ALL cycles authorized (controller NOT filtering)")
+            print("  -> DIAG: ALL cycles authorized (controller NOT filtering)")
         elif len(auth_cycles) < len(cycle_log) * 0.3:
             print(f"  -> DIAG: Controller very selective ({len(auth_cycles)}/{len(cycle_log)} authorized)")
         else:

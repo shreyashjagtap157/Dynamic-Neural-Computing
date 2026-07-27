@@ -159,7 +159,7 @@ def run_conformance_suite() -> Tuple[int, int, List[Tuple[str, int, int]]]:
             continue
         try:
             out = subprocess.run(
-                [sys.executable, str(tf)],
+                [sys.executable, "-m", "pytest", "-q", str(tf)],
                 cwd=str(REPO_ROOT),
                 capture_output=True,
                 text=True,
@@ -169,16 +169,13 @@ def run_conformance_suite() -> Tuple[int, int, List[Tuple[str, int, int]]]:
             results.append((str(tf.relative_to(TESTS_DIR)), 0, 0))
             continue
         rel = str(tf.relative_to(TESTS_DIR)).replace("\\", "/")
-        n_match = re.search(
-            r"(\d+)\s*/\s*(\d+)\s*(?:conformance tests|tests) passed",
-            out.stdout,
-        )
-        if n_match:
-            passed = int(n_match.group(1))
-            count = int(n_match.group(2))
-        else:
-            passed = out.stdout.count("PASS:")
-            count = passed + out.stdout.count("FAIL:")
+        passed_match = re.search(r"(\d+) passed", out.stdout)
+        failed_match = re.search(r"(\d+) failed", out.stdout)
+        error_match = re.search(r"(\d+) errors?", out.stdout)
+        passed = int(passed_match.group(1)) if passed_match else 0
+        failed = int(failed_match.group(1)) if failed_match else 0
+        errors = int(error_match.group(1)) if error_match else 0
+        count = passed + failed + errors
         results.append((rel, passed, count))
         total_passed += passed
         total_count += count
@@ -242,17 +239,24 @@ def render(invariants, cov, conf_pass, conf_total, conf_rows, acd_res, acd_tot, 
     covered_inv = sum(1 for inv in invariants if cov[inv])
     inv_total = len(invariants)
     inv_pct = round(100 * covered_inv / inv_total, 1) if inv_total else 0.0
+    fully = (
+        conf_total > 0
+        and conf_pass == conf_total
+        and acd_tot > 0
+        and acd_res == acd_tot
+        and spec_ok
+        and covered_inv == inv_total
+    )
 
     # Spec tooling.
     today = datetime.date.today().isoformat()
-    commit = _git(["rev-parse", "--short", "HEAD"]) or "unknown"
 
     lines: List[str] = []
     lines.append("# Architecture Conformance Report")
     lines.append("")
     lines.append("Version: 1.0")
     lines.append(f"Generated: {today}")
-    lines.append(f"Implementation commit: {commit}")
+    lines.append("Implementation source: repository state at generation time")
     lines.append(f"Implementation version: {IMPLEMENTATION_VERSION}")
     lines.append("")
     lines.append("> This is a release artifact, not documentation. Regenerate every")
@@ -320,7 +324,14 @@ def render(invariants, cov, conf_pass, conf_total, conf_rows, acd_res, acd_tot, 
     lines.append("")
     lines.append("## Known Deviations")
     lines.append("")
-    lines.append("None. All four Architecture Conformance Defects (ACD-001..ACD-004) are resolved.")
+    if fully:
+        lines.append("None. All discovered invariants and conformance defects are covered.")
+    else:
+        uncovered = [inv for inv in sorted(invariants) if not cov[inv]]
+        lines.append(
+            f"Executable invariant coverage is incomplete ({covered_inv}/{inv_total}). "
+            f"Uncovered: {', '.join(uncovered) or 'none'}."
+        )
     lines.append("")
     lines.append("## Known Limitations")
     lines.append("")
@@ -335,13 +346,12 @@ def render(invariants, cov, conf_pass, conf_total, conf_rows, acd_res, acd_tot, 
     lines.append("")
     lines.append("## Architecture Conformance Statement")
     lines.append("")
-    lines.append("> Architecture v1.0 is approved as conformant. The reference runtime")
-    lines.append("> satisfies its defined execution semantics, rollback semantics, replay")
-    lines.append("> semantics, and provider abstraction to the extent specified. Remaining")
-    lines.append("> work concerns capability expansion rather than architectural correction.")
-    lines.append("> Future phases should preserve Architecture v1.0 as the stable specification")
-    lines.append("> baseline and treat new planners, providers, metrics, and learning mechanisms as")
-    lines.append("> conforming extensions rather than architectural revisions.")
+    if fully:
+        lines.append("> Architecture v1.0 is conformant against all currently discovered executable gates.")
+    else:
+        lines.append("> Architecture v1.0 conformance is **PARTIAL**. Passing implemented tests does not")
+        lines.append("> establish the uncovered invariants. A production release must add executable")
+        lines.append("> evidence for every discovered invariant or formally supersede it.")
     lines.append("")
     return "\n".join(lines)
 
@@ -373,7 +383,14 @@ def main() -> int:
     args.out.write_text(report, encoding="utf-8")
     print(f"Wrote {args.out.relative_to(REPO_ROOT)}")
 
-    fully = conf_pass == conf_total and acd_res == acd_tot and spec_ok
+    fully = (
+        conf_total > 0
+        and conf_pass == conf_total
+        and acd_tot > 0
+        and acd_res == acd_tot
+        and spec_ok
+        and all(cov[inv] for inv in invariants)
+    )
     print(
         f"Invariants: {sum(1 for i in invariants if cov[i])}/{len(invariants)} covered, "
         f"Conformance: {conf_pass}/{conf_total} passed, "

@@ -7,14 +7,11 @@ owning document in the registry. Contracts are validated on registration.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, FrozenSet, List, Optional, Tuple
+from typing import Any
 
 from dnc.runtime.types import (
-    Buffer,
     ModuleTypeID,
     ModuleContract,
-    UNBOUND,
-    PENDING,
 )
 
 

@@ -87,10 +87,6 @@ class TestPhase3ExitCriteria:
         assert pl.verify_chain() is True
 
         events = list(pl._events)
-        events[1]._fields = tuple(
-            dict(zip(['event_id','event_type','timestamp','execution_id','step_index','causal_ref','payload','integrity_hash'], ev))
-            for ev in [events[1]]
-        )[0] if False else events[1]
         try:
             pl._events[1] = ProvenanceEvent(
                 event_id=events[1].event_id,
@@ -225,7 +221,7 @@ class TestPhase3ExitCriteria:
             ExecutionRecord("ex2", "task_A", [0.75, 0.72, 0.88], 2.0),
             ExecutionRecord("ex3", "task_B", [0.6, 0.5, 0.7], 3.0),
         ]
-        dr._representative_sample = {0, 1, 2}
+        dr._representative_sample = {0}
         dr._centers = [[0.8, 0.7, 0.9], [0.75, 0.72, 0.88], [0.6, 0.5, 0.7]]
         dr._cluster_assignments = [0, 1, 2]
 
@@ -233,6 +229,7 @@ class TestPhase3ExitCriteria:
         assert is_within is True
 
         far_vector = [0.2, 0.2, 0.2]
+        dr._representative_sample = {0, 1, 2}
         is_within_far, far_violations = dr.is_within_drift_bound(far_vector, DRIFT_BOUND)
         assert is_within_far is False
         assert len(far_violations) > 0

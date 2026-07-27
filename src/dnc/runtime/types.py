@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, FrozenSet, Hashable, Optional
+from typing import Any, Dict, FrozenSet, Optional
 
 
 class ModuleInstanceID:
@@ -16,7 +16,11 @@ class ModuleInstanceID:
 
     def __init__(self, type_id: str, instance_counter: Optional[int] = None) -> None:
         self._type_id = type_id
-        self._instance_uuid = uuid.uuid4()
+        self._instance_uuid = (
+            uuid.uuid5(uuid.NAMESPACE_URL, f"dnc:{type_id}:{instance_counter}")
+            if instance_counter is not None
+            else uuid.uuid4()
+        )
 
     @property
     def type_id(self) -> str:
@@ -39,6 +43,10 @@ class ModuleInstanceID:
 
     def __repr__(self) -> str:
         return f"ModuleInstanceID({self._type_id}, {str(self._instance_uuid)[:8]})"
+
+    def __deepcopy__(self, memo: Dict[int, object]) -> "ModuleInstanceID":
+        # Identity objects are immutable and must remain stable across snapshots.
+        return self
 
 
 class ModuleTypeID:
@@ -121,6 +129,13 @@ class PENDING:
 
     def __hash__(self) -> int:
         return hash("PENDING")
+
+
+# Stable compatibility names used by the v1 execution-core API.  The sentinel
+# classes are intentionally exposed as types because callers use ``isinstance``
+# to distinguish state from user values.
+UNBOUND_TYPE = UNBOUND
+PENDING_TYPE = PENDING
 
 
 Value = Any

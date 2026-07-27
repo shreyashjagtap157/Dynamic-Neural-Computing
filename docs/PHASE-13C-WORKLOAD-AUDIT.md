@@ -1,5 +1,9 @@
 # Phase 13C.1 — Workload Discriminativeness Audit Report
 
+> **Historical report:** This document records the pre-necessity-gate pilot and must not be read as
+> current repository status. The current validity audit is
+> [`research/PHASE-13D-COUNTERFACTUAL-VALIDITY-AUDIT.md`](research/PHASE-13D-COUNTERFACTUAL-VALIDITY-AUDIT.md).
+
 **Date**: 2026-07-25
 **Status**: Audit Complete — Workloads Redesigned
 **Pilot Runs**: 84/84 (100%)

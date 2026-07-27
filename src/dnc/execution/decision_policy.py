@@ -9,7 +9,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, List, Optional
 
 import time
 
@@ -230,7 +230,10 @@ class RulePolicy(DecisionPolicy):
         es = getattr(self, "_current_es", None)
         if es is None:
             return True
-        if es.step_index - self._last_replan_step < self._replan_cooldown_steps:
+        if (
+            self._last_replan_step >= 0
+            and es.step_index - self._last_replan_step < self._replan_cooldown_steps
+        ):
             return False
         return True
 

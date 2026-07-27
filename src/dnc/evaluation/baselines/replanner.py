@@ -4,7 +4,7 @@ Implements BenchmarkSystem for a static planner that recompiles graph upon fault
 """
 
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from dnc.evaluation.contracts import BenchmarkSystem, ExperimentResult
 
 

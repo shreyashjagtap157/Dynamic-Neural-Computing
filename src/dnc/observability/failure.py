@@ -6,8 +6,8 @@ Per failure-taxonomy.md DEF-FAIL-1 through DEF-FAIL-7 and INV-FAIL-1 through INV
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum, auto
-from typing import Dict, List, Optional, Any
+from enum import Enum
+from typing import Dict, Optional, Any
 
 from dnc.runtime.types import ModuleInstanceID
 
@@ -105,7 +105,8 @@ class FailureClassifier:
     ) -> None:
         """Per INV-FAIL-5: track failure rate per module type."""
         key = module_type_name
-        failures = self._failure_counts.get(key, 0)
+        failures = self._failure_counts.get(key, 0) + 1
+        self._failure_counts[key] = failures
         if total_invocations > 0:
             self._module_failure_rates[key] = failures / total_invocations
 

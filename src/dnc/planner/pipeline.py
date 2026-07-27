@@ -8,15 +8,13 @@ Per planner-pipeline.md DEF-PLANNER-1 through DEF-PLANNER-7:
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set, Tuple
+from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
 
 from dnc.runtime.types import ModuleInstanceID, ModuleTypeID, ModuleContract
 from dnc.state.registry import ModuleRegistry
 from dnc.state.execution_state import ExecutionState
-from dnc.state.working_memory import WorkingMemory
 from dnc.scheduler.scheduler import Scheduler
 from dnc.runtime.types import DAGCycle
 

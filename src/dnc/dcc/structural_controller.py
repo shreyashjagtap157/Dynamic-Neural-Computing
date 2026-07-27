@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
 from enum import Enum
 from dnc.ir.graph import StructuralGraph
-from dnc.ir.identity import GraphID, UnitID
 from dnc.dcc.dcc_contracts import MutationProposal, AuthorizationDecision
 
 

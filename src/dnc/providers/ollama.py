@@ -7,7 +7,7 @@ OllamaProvider implements the ExecutionProvider interface for Ollama's REST API.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, FrozenSet, Optional, Set
 
 from dnc.execution.execution_provider import (
@@ -203,7 +203,7 @@ class OllamaProvider(ExecutionProvider):
                     "embedding": data.get("embedding", []),
                     "model": model,
                 }
-        except urllib.error.URLError as e:
+        except urllib.error.URLError:
             return {
                 "embedding": [0.0] * 384,
                 "model": model,

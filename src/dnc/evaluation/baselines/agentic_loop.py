@@ -4,7 +4,7 @@ Implements BenchmarkSystem for sequential tool-calling agentic loops without str
 """
 
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from dnc.evaluation.contracts import BenchmarkSystem, ExperimentResult
 
 

@@ -16,7 +16,7 @@ from dnc.runtime.types import (
     ModuleContract,
 )
 from dnc.state.execution_state import ExecutionState
-from dnc.state.working_memory import WorkingMemory
+from dnc.state.working_memory import HistoryLog, WorkingMemory
 from dnc.state.checkpoint import Checkpoint, CheckpointRecord
 from dnc.state.registry import ModuleRegistry
 from dnc.scheduler.scheduler import Scheduler

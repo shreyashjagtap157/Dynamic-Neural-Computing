@@ -4,8 +4,7 @@ Orchestrates experiment executions across systems and workloads with determinist
 """
 
 import random
-import time
-from typing import List, Dict, Any, Type
+from typing import List, Dict, Type
 from dnc.evaluation.contracts import BenchmarkSystem, ExperimentResult
 from dnc.evaluation.baselines.static_dag import StaticDAGSystem
 from dnc.evaluation.baselines.replanner import ReplannerSystem
@@ -64,4 +63,32 @@ class BenchmarkRunner:
             results.append(result)
             system.shutdown()
 
+        return results
+
+    def run_experiment(
+        self,
+        system_key: str,
+        workload_id: str,
+        task_inputs: List[dict],
+        base_seed: int = 42,
+    ) -> List[ExperimentResult]:
+        """Run explicit task inputs through a registered system.
+
+        This entry point is useful for integrity tests and user-supplied
+        workloads that are intentionally not registered in WorkloadTaxonomy.
+        """
+        system_factory = self.registered_systems.get(system_key)
+        if system_factory is None:
+            raise KeyError(f"System '{system_key}' not registered in BenchmarkRunner.")
+
+        results: List[ExperimentResult] = []
+        for rep in range(self.repetitions):
+            seed = base_seed + rep
+            random.seed(seed)
+            system = system_factory()
+            system.initialize(workload_id=workload_id, seed=seed, config={})
+            for task_input in task_inputs:
+                system.execute(dict(task_input))
+            results.append(system.get_result())
+            system.shutdown()
         return results

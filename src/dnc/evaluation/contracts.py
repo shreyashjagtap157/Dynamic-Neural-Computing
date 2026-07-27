@@ -4,7 +4,7 @@ Defines uniform experiment interfaces, experiment results, and system adapter co
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Protocol
+from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
 
 

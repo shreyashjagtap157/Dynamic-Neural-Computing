@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum, auto
-from typing import Any, Dict, FrozenSet, List, Optional, Set
+from typing import Any, Dict, List, Optional
 import uuid
 
 
@@ -79,6 +79,7 @@ class ModuleInvocationRecord:
     provider_version: str
     latency_ms: float
     tokens_used: Optional[int] = None
+    cost_usd: Optional[float] = None
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -95,6 +96,17 @@ class ResourceUsageRecord:
 
 
 @dataclass(frozen=True)
+class StateMutationRecord:
+    """A state transition performed during one control-loop iteration."""
+
+    mutation_type: str
+    target: str
+    step_before: int
+    step_after: int
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class ExecutionRecord:
     """Per execution-trace-format.md: a single record within the execution trace."""
 
@@ -103,6 +115,7 @@ class ExecutionRecord:
     observation: ObservationRecord
     decision: DecisionRecord
     module_invocations: List[ModuleInvocationRecord] = field(default_factory=list)
+    state_mutations: List[StateMutationRecord] = field(default_factory=list)
     resource_usage: Optional[ResourceUsageRecord] = None
     timestamp: str = ""
 
@@ -190,21 +203,55 @@ class ExecutionTrace:
                         "raw_signals": r.observation.raw_signals,
                         "signal_types": r.observation.signal_types,
                         "timestamp": r.observation.timestamp,
+                        "metadata": r.observation.metadata,
                     },
                     "decision": {
                         "decision": r.decision.decision,
                         "policy_type": r.decision.policy_type,
                         "policy_version": r.decision.policy_version,
                         "reasoning": r.decision.reasoning,
+                        "confidence": r.decision.confidence,
+                        "alternative_considered": r.decision.alternative_considered,
+                        "latency_ms": r.decision.latency_ms,
                     },
                     "module_invocations": [
                         {
                             "module_instance_id": m.module_instance_id,
                             "module_type": m.module_type,
+                            "capability": m.capability,
+                            "input_size_bytes": m.input_size_bytes,
+                            "output_size_bytes": m.output_size_bytes,
+                            "provider_id": m.provider_id,
+                            "provider_version": m.provider_version,
                             "latency_ms": m.latency_ms,
+                            "tokens_used": m.tokens_used,
+                            "cost_usd": m.cost_usd,
+                            "error": m.error,
+                            "metadata": m.metadata,
                         }
                         for m in r.module_invocations
                     ],
+                    "state_mutations": [
+                        {
+                            "mutation_type": mutation.mutation_type,
+                            "target": mutation.target,
+                            "step_before": mutation.step_before,
+                            "step_after": mutation.step_after,
+                            "metadata": mutation.metadata,
+                        }
+                        for mutation in r.state_mutations
+                    ],
+                    "resource_usage": (
+                        {
+                            "step_index": r.resource_usage.step_index,
+                            "budget_remaining": r.resource_usage.budget_remaining,
+                            "cpu_time_ms": r.resource_usage.cpu_time_ms,
+                            "memory_bytes": r.resource_usage.memory_bytes,
+                            "network_calls": r.resource_usage.network_calls,
+                        }
+                        if r.resource_usage else None
+                    ),
+                    "timestamp": r.timestamp,
                 }
                 for r in self.execution_record
             ],
@@ -217,3 +264,12 @@ class ExecutionTrace:
     @property
     def is_complete(self) -> bool:
         return self.timestamp_end is not None and self.termination_reason is not None
+
+
+def __getattr__(name: str) -> Any:
+    """Lazily expose replay types from their canonical module for v1 clients."""
+    if name in {"ReplayEngine", "ReplayResult", "ReplayStepResult"}:
+        from dnc.execution import replay_engine
+
+        return getattr(replay_engine, name)
+    raise AttributeError(name)

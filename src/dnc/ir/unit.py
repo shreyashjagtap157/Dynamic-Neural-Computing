@@ -5,7 +5,7 @@ Implements ComputationalUnit, three orthogonal dimensions, contracts, capabiliti
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Any, List, Set, Optional
+from typing import Dict, Any, List, Set
 from .identity import UnitID
 
 class StructureDimension(str, Enum):

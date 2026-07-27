@@ -49,13 +49,32 @@ class EvaluationScenario:
 
 @dataclass
 class EvaluationRun:
-    run_id: str
+    run_id: str = ""
+    scenario_id: str = ""
+    runtime_under_test: str = ""
+    baseline_ids: List[str] = field(default_factory=list)
+    metric_results: List[MetricResult] = field(default_factory=list)
+    timestamp: float = 0.0
+    statistical_analysis: Dict[str, Any] = field(default_factory=dict)
+    trial_results: List["TrialResult"] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class MetricSpec:
+    name: str
+    higher_is_better: bool = True
+
+
+@dataclass(frozen=True)
+class TrialResult:
     scenario_id: str
-    runtime_under_test: str
-    baseline_ids: List[str]
-    metric_results: List[MetricResult]
-    timestamp: float
-    statistical_analysis: Dict[str, Any]
+    metric_spec: MetricSpec
+    baseline_mean: float
+    current_mean: float
+    p_value: float
+    effect_size: float
+    n_trials: int
 
 
 class EvaluationStage(Enum):
@@ -118,12 +137,16 @@ class EvaluationSuite:
         pooled_n = n + n_base
         if pooled_n > 0 and std_val + std_base > 0:
             cohens_d = (mean_val - mean_base) / ((std_val + std_base) / 2)
+        elif mean_val != mean_base:
+            cohens_d = math.copysign(math.inf, mean_val - mean_base)
         else:
             cohens_d = 0.0
 
         t_stat = 0.0
         p_value = 1.0
-        if std_val > 0 and std_base > 0 and n > 1 and n_base > 1:
+        if std_val == 0 and std_base == 0 and mean_val != mean_base:
+            p_value = 0.0
+        elif std_val > 0 and std_base > 0 and n > 1 and n_base > 1:
             se = math.sqrt((std_val ** 2 / n) + (std_base ** 2 / n_base))
             if se > 0:
                 t_stat = (mean_val - mean_base) / se
