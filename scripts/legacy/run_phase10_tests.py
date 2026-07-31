@@ -8,15 +8,12 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from dnc.dcc.assessment_engine import ExecutionResult, Assessment, AdaptationKnowledge
+from dnc.dcc.assessment_engine import ExecutionResult, Assessment
 from dnc.dcc.dcc_contracts import MutationProposal, AuthorizationDecision
 from dnc.dcc.learning_engine import (
     LearningEngine, PredictionTracker, DeterministicLearningPolicy,
-    PredictionRecord, OutcomeRecord, PredictionError, LearningSignal,
-    AdaptationKnowledgeBase, GeneratorInfluence
+    PredictionRecord, OutcomeRecord, GeneratorInfluence
 )
-from dnc.ir.operations import IROperation, OperationType
-from dnc.ir.identity import UnitID
 
 def test_prediction_tracker_records():
     """Requirement 1: Records predicted utility/cost/risk before execution."""
@@ -47,7 +44,7 @@ def test_outcome_record_from_assessment():
         metrics={"utility": 0.65},
         success=True
     )
-    proposal = MutationProposal(
+    MutationProposal(
         proposal_id="out_test_1",
         target_graph_id="test_g",
         candidate_operations=[],
@@ -71,7 +68,7 @@ def test_outcome_record_from_assessment():
     assert outcome.proposal_id == "out_test_1"
     assert outcome.observed_utility == 0.65
     assert outcome.improvement_delta == -0.15
-    assert outcome.successful == True
+    assert outcome.successful
     print("PASS: test_outcome_record_from_assessment")
 
 def test_prediction_error_computation():
@@ -98,7 +95,7 @@ def test_prediction_error_computation():
     assert error.proposal_id == "err_test_1"
     assert abs(error.utility_error - (-0.15)) < 1e-9
     assert abs(error.cost_error - 0.5) < 1e-9
-    assert error.risk_miss == True
+    assert error.risk_miss
     assert error.absolute_error == 0.65
     print("PASS: test_prediction_error_computation")
 

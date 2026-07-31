@@ -103,7 +103,7 @@ def main() -> int:
                 elapsed = time.monotonic() - t0
                 err = f"{str(exc).splitlines()[0] if str(exc) else 'AssertionError'}"
                 results.append((module_path, test_name, f"FAIL: {err[:160]}", elapsed))
-            except Exception as exc:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 elapsed = time.monotonic() - t0
                 tb_lines = traceback.format_exc().splitlines()
                 tail = next(
@@ -124,7 +124,7 @@ def main() -> int:
             per_file[path]["OTHER"] += 1
 
     with open(RESULT_FILE, "w", encoding="utf-8") as fh:
-        fh.write(f"# Conformance test results\n\n")
+        fh.write("# Conformance test results\n\n")
         fh.write(f"Total: {len(results)} | PASS: {pass_count} | FAIL/ERR: {fail_count}\n\n")
         fh.write("Per file:\n")
         for path in sorted(per_file):

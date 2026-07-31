@@ -251,7 +251,7 @@ def test_generator_proposal_has_operations():
     for proposal in proposals:
         assert len(proposal.candidate_operations) > 0
         assert all(isinstance(op, IROperation) for op in proposal.candidate_operations)
-    print(f"PASS: test_generator_proposal_has_operations")
+    print("PASS: test_generator_proposal_has_operations")
 
 def test_generator_deterministic():
     """Generator produces same proposals for same graph state."""
@@ -289,7 +289,7 @@ def test_generator_deterministic():
     proposals2 = gen2.generate_proposals(graph2, context2)
     assert len(proposals1) == len(proposals2)
     assert all(p1.rationale == p2.rationale for p1, p2 in zip(proposals1, proposals2))
-    print(f"PASS: test_generator_deterministic")
+    print("PASS: test_generator_deterministic")
 
 def run_all_tests():
     tests = [

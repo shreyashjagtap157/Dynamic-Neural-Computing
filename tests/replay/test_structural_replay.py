@@ -1,4 +1,3 @@
-import pytest
 from dnc.ir.identity import GraphID, UnitID, GraphVersion
 from dnc.ir.unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension
 from dnc.ir.graph import StructuralGraph, EdgeType

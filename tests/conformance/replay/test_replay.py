@@ -23,7 +23,7 @@ from dnc.state.registry import ModuleRegistry
 from dnc.scheduler.scheduler import Scheduler
 from dnc.planner.pipeline import ExecutionGraph, VertexAssignment
 from dnc.runtime.runtime import Runtime, Decision, ExecutionState2
-from dnc.execution.replay_engine import ReplayEngine, ReplayConfig
+from dnc.execution.replay_engine import ReplayEngine
 from dnc.execution.execution_trace import (
     ExecutionTrace,
     ExecutionRecord,

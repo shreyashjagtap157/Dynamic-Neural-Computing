@@ -3,6 +3,8 @@ DNC Assessment and Adaptation Layer (Phase 9)
 Bridges execution results back to DCCL adaptation decisions.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple, TYPE_CHECKING
 from dnc.ir.graph import StructuralGraph

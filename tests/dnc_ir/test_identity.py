@@ -1,5 +1,5 @@
 import pytest
-from dnc.ir.identity import UnitID, GraphID, GraphVersion, IdentityRegistry
+from dnc.ir.identity import UnitID, GraphVersion, IdentityRegistry
 
 def test_identity_immutability():
     uid = UnitID("unit_test_1")

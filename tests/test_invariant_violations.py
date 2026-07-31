@@ -15,14 +15,13 @@ from dnc.runtime.types import (
     ModuleTypeID,
     ModuleContract,
     StateComponentViolation,
-    InvariantViolation,
     DAGCycle,
 )
 from dnc.state.execution_state import ExecutionState
 from dnc.state.working_memory import WorkingMemory, HistoryLog
 from dnc.state.checkpoint import Checkpoint, CheckpointRecord
 from dnc.scheduler.scheduler import Scheduler
-from dnc.invariants.runtime_invariants import RuntimeInvariantSet, check_invariants
+from dnc.invariants.runtime_invariants import RuntimeInvariantSet
 
 
 RIS = RuntimeInvariantSet()

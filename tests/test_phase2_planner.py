@@ -8,8 +8,6 @@ import time
 sys.path.insert(0, 'src')
 
 from dnc.runtime.types import (
-    UNBOUND,
-    PENDING,
     Buffer,
     ModuleInstanceID,
     ModuleTypeID,
@@ -17,20 +15,17 @@ from dnc.runtime.types import (
 )
 from dnc.state.execution_state import ExecutionState
 from dnc.state.working_memory import HistoryLog, WorkingMemory
-from dnc.state.checkpoint import Checkpoint, CheckpointRecord
+from dnc.state.checkpoint import CheckpointRecord
 from dnc.state.registry import ModuleRegistry
 from dnc.scheduler.scheduler import Scheduler
 from dnc.planner.pipeline import (
     Planner,
     PlanningTask,
     ExecutionGraph,
-    ReplanContext,
 )
-from dnc.cost.semantics import CostBudget, CostForecaster
 from dnc.runtime.runtime import (
     Runtime,
     Decision,
-    AssessmentKind,
     ExecutionState2,
     LatencyConfig,
 )
@@ -194,7 +189,7 @@ class TestPhase2ExitCriteria:
 
         runtime._pending_signals = ["trigger_replan"]
         obs = runtime.observe()
-        decision = runtime.decide(obs, es)
+        runtime.decide(obs, es)
 
         assert was_called == [], "Replan should not execute during critical section"
 

@@ -76,3 +76,16 @@ Draft → Review → Frozen → Amended → Superseded → Archived
 | DIST-AMEND-001 | SPEC-DIST | 2026-07-12 | Baseline v1.0: resolved open issues INV-DIST-3/4/5/6 | No |
 | FRZ-001 | All spec docs | 2026-07-12 | Frozen to Baseline v1.0 via tools/freeze_spec.py | No |
 | ARCH-AMEND-002 | SPEC-ARCH | 2026-07-13 | Baseline v1.1: reference runtime declared conformant with Architecture v1.0 (ACD-001..ACD-004 resolved, closed by tests/conformance/). Conformance report artifact at docs/conformance-report.md. | No |
+
+## Draft Cognitive Runtime Extensions
+
+These documents are draft governance extensions for the expanded DNC intent. They do not amend or replace the frozen kernel specifications until approved through the normal review process.
+
+| Document ID | Title | State | Related profile |
+|---|---|---|---|
+| RFC-0001 | DNC Cognitive Runtime Profile | Draft | C |
+| DNC-MATURITY-PROFILES | K/C/N/E Maturity Profiles | Draft | K, C, N, E |
+| NO-OP-STOP | `NO_OP` and `STOP` Terminology | Draft | K, C |
+| PHASE1-KERNEL | Kernel hardening inventory, compatibility, dependency, lint, and SBOM evidence | Draft | K |
+| PHASE2-SNAPSHOT | Snapshot manifest, isolation grades, reproducibility grades, and effect ledger | Draft | K |
+| PHASE3-COGNITION | Canonical cognitive contracts, epistemic state, schema hashing, import/export, and invalidation | Draft | C |

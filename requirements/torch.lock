@@ -1,0 +1,2 @@
+# Optional backend version. Platform-specific transitive wheels are resolved separately.
+torch==2.2.0

@@ -1,7 +1,7 @@
 # Architecture Conformance Report
 
 Version: 1.0
-Generated: 2026-07-27
+Generated: 2026-07-31
 Implementation source: repository state at generation time
 Implementation version: 0.1.0
 
@@ -53,7 +53,7 @@ All 4 ACDs are RESOLVED.
 | Invariant | Title | Tests |
 |---|---|---|
 | INV-1 | Execution Header Immutability): | test_invariant_verifier.py, test_invariant_violations.py, test_real_world_xor.py |
-| INV-10 | Normative Statement Keyword Discipline): | conformance/execution/test_execution_invariants.py, conformance/policy/test_policy_invariants.py, conformance/providers/test_provider_dispatch.py, conformance/replay/test_replay.py, conformance/replay/test_replay_invariants.py, conformance/runtime/test_control_loop.py, conformance/runtime/test_rollback.py, phase1_exit_criteria.py, test_g12_byte_exact.py, test_integration.py, test_invariant_violations.py, test_phase2_planner.py, test_phase4_production.py, test_phase5b.py, test_real_world_xor.py |
+| INV-10 | Normative Statement Keyword Discipline): | conformance/execution/test_execution_invariants.py, conformance/policy/test_policy_invariants.py, conformance/providers/test_provider_dispatch.py, conformance/replay/test_replay.py, conformance/replay/test_replay_invariants.py, conformance/runtime/test_control_loop.py, conformance/runtime/test_rollback.py, test_g12_byte_exact.py, test_integration.py, test_invariant_violations.py, test_phase2_planner.py, test_phase4_production.py, test_phase5b.py, test_real_world_xor.py |
 | INV-11 | Preservation Under Extension): | test_invariant_violations.py |
 | INV-2 | DAG Acyclicity): | test_invariant_verifier.py, test_invariant_violations.py |
 | INV-3 | No Undefined Behavior): | test_invariant_violations.py |

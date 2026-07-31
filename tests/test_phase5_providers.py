@@ -9,7 +9,6 @@ Tests for:
 from __future__ import annotations
 
 import sys
-import math
 
 sys.path.insert(0, "src")
 
@@ -25,11 +24,9 @@ from dnc.providers.anthropic import AnthropicConfig, AnthropicProvider
 from dnc.providers.gemini import GeminiConfig, GeminiProvider
 from dnc.evaluation.computation_aware import (
     ComputationMonitor,
-    ComputationReport,
     Level0Metrics,
     Level1Metrics,
     Level2Metrics,
-    Level3Metrics,
 )
 from dnc.execution.execution_trace import (
     ExecutionTrace,

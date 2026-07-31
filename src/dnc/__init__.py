@@ -7,11 +7,25 @@ from dnc.system import (
     ReferenceExecutionCore,
     SystemStateSnapshot,
 )
+from dnc.execution.snapshot import (
+    EffectLedgerEntry,
+    EffectType,
+    IsolationGrade,
+    ReproducibilityGrade,
+    Snapshot,
+    SnapshotManifest,
+)
 
 __all__ = [
     "DNCSystem",
     "DNCSystemConfig",
+    "EffectLedgerEntry",
+    "EffectType",
     "ExecutionCore",
+    "IsolationGrade",
     "ReferenceExecutionCore",
+    "ReproducibilityGrade",
+    "Snapshot",
+    "SnapshotManifest",
     "SystemStateSnapshot",
 ]
