@@ -11,19 +11,19 @@
 | `EXE-001` execution-core protocol foundation | Reference complete | Existing `ExecutionCore` protocol plus `DNCSystem.capture_execution_snapshot` and `restore_execution_snapshot` |
 | `EXE-002` snapshot/isolation schemas | Reference complete | `src/dnc/execution/snapshot.py`; `docs/execution/PHASE2-SNAPSHOT-ISOLATION.md` |
 | `EXE-003` mutable state audit | Reference complete | Snapshot manifest declares captured and uncaptured graph/runtime/provider/filesystem/database/network/accelerator/environment state; shared mutable state rejection helpers |
-| `EXE-004` process-local snapshot/restore | Reference complete | `ReferenceSnapshotManager`; `tests/execution/test_snapshot_phase2.py` |
+| `EXE-004` process-local snapshot/restore | Reference complete | `ReferenceSnapshotManager`; graph and runtime hashes are verified atomically before restore; `tests/execution/test_snapshot_phase2.py` |
 | `EXE-005` PyTorch snapshot/restore | Environment-qualified complete | `PyTorchSnapshotManager` captures module parameters/buffers, optimizer, scheduler, scaler, CPU/all-device RNG, sampler position, and code/config fingerprints; test verifies truthful unavailability when Torch is absent and the full restore path when Torch is installed |
 | `EXE-006` external-response recording/replay | Reference complete | `ProviderRecording`, `ProviderReplayStore`, `RecordingExecutionProvider`, stable `request_hash`, replay and deny-live tests |
 | `EXE-007` deadline/cancellation propagation and cleanup reconciler | Reference complete | `CancellationToken`, `ExecutionDeadline`, `run_with_guards`, `CleanupReconciler` |
 | `EXE-008` effect ledger | Reference complete | `EffectLedgerEntry`, `EffectType`, `EffectLedger`, `IdempotencyRegistry`, compensation tests |
-| `EXE-009` isolation/reproducibility grade declaration | Reference complete | `SnapshotManifest.reproducibility_grade` and `isolation_grade` |
+| `EXE-009` isolation/reproducibility grade declaration | Reference complete | In-process reference snapshots truthfully declare `I1_GRAPH_ONLY`; dedicated-process `I2` is not claimed |
 | `EXE-010` shared mutable backend/cache rejection | Reference complete | `SharedStateDeclaration`, `reject_unsafe_shared_state`, `default_mutable_state_audit` |
 | `EXE-011` process/container sandbox prototype | Policy prototype complete | `SandboxPolicy` deny-by-default network/provider/file-write checks |
 | `EXE-012` fault injection | Reference complete | Missing recording, deny-live, duplicate effect, idempotency conflict, cancellation, deadline, bad snapshot hash, sandbox denial tests |
 
 ## Verification
 
-- Full suite: `240/240` passed.
+- Full suite: `255/255` passed, with one credential-gated live qualification skipped.
 - Ruff gate across `src`, `tests`, `tools`, and `scripts`: passed.
 - Bytecode compile gate across `src`, `tests`, `tools`, and `scripts`: passed.
 - Focused Phase 2 tests: `tests/execution/test_snapshot_phase2.py` passed with 17 tests.

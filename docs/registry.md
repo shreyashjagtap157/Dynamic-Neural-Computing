@@ -89,3 +89,4 @@ These documents are draft governance extensions for the expanded DNC intent. The
 | PHASE1-KERNEL | Kernel hardening inventory, compatibility, dependency, lint, and SBOM evidence | Draft | K |
 | PHASE2-SNAPSHOT | Snapshot manifest, isolation grades, reproducibility grades, and effect ledger | Draft | K |
 | PHASE3-COGNITION | Canonical cognitive contracts, epistemic state, schema hashing, import/export, and invalidation | Draft | C |
+| PHASE4-CAPABILITIES | Capability registry, auditable broker, provider-neutral adapters, resilience, and backend cards | Draft | C |

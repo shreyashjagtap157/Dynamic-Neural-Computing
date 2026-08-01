@@ -169,3 +169,109 @@ COGNITIVE_STATE_SCHEMA: dict[str, Any] = {
     },
     "additionalProperties": True,
 }
+
+
+EVIDENCE_REF_SCHEMA: dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://dnc.local/schemas/cognition/evidence-ref.v1.json",
+    "type": "object",
+    "required": [
+        "schema_version", "evidence_id", "artifact_hash", "source_type",
+        "source_identity", "acquired_at", "tenant_id", "security_labels",
+    ],
+    "properties": {
+        "schema_version": {"const": COGNITIVE_SCHEMA_VERSION},
+        "evidence_id": {"type": "string", "minLength": 1},
+        "artifact_hash": {"type": "string", "minLength": 1},
+        "source_type": {"type": "string"},
+        "source_identity": {"type": "string", "minLength": 1},
+        "acquired_at": {"type": "string", "minLength": 1},
+        "tenant_id": {"type": "string", "minLength": 1},
+        "security_labels": {"type": "array", "items": {"type": "string"}},
+    },
+    "additionalProperties": True,
+}
+
+
+EPISTEMIC_RELATION_SCHEMA: dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://dnc.local/schemas/cognition/epistemic-relation.v1.json",
+    "type": "object",
+    "required": ["schema_version", "relation_id", "relation_type", "source_id", "target_id", "tenant_id"],
+    "properties": {
+        "schema_version": {"const": COGNITIVE_SCHEMA_VERSION},
+        "relation_id": {"type": "string", "minLength": 1},
+        "relation_type": {"enum": ["SUPPORTS", "CONTRADICTS", "DEPENDS_ON", "INVALIDATES"]},
+        "source_id": {"type": "string", "minLength": 1},
+        "target_id": {"type": "string", "minLength": 1},
+        "tenant_id": {"type": "string", "minLength": 1},
+    },
+    "additionalProperties": True,
+}
+
+
+HYPOTHESIS_SCHEMA: dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://dnc.local/schemas/cognition/hypothesis.v1.json",
+    "type": "object",
+    "required": ["schema_version", "hypothesis_id", "proposition", "status", "tenant_id"],
+    "properties": {
+        "schema_version": {"const": COGNITIVE_SCHEMA_VERSION},
+        "hypothesis_id": {"type": "string", "minLength": 1},
+        "proposition": {"type": "string", "minLength": 1},
+        "status": {"type": "string"},
+        "tenant_id": {"type": "string", "minLength": 1},
+    },
+    "additionalProperties": True,
+}
+
+
+ACTION_OUTCOME_SCHEMA: dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://dnc.local/schemas/cognition/action-outcome.v1.json",
+    "type": "object",
+    "required": [
+        "schema_version", "outcome_id", "action_id", "attempt_id", "trace_id",
+        "lifecycle_state", "execution_status",
+    ],
+    "properties": {
+        "schema_version": {"const": COGNITIVE_SCHEMA_VERSION},
+        "outcome_id": {"type": "string", "minLength": 1},
+        "action_id": {"type": "string", "minLength": 1},
+        "attempt_id": {"type": "string", "minLength": 1},
+        "trace_id": {"type": "string", "minLength": 1},
+        "lifecycle_state": {"type": "string"},
+        "execution_status": {"type": "string"},
+    },
+    "additionalProperties": True,
+}
+
+
+CONFIDENCE_ESTIMATE_SCHEMA: dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://dnc.local/schemas/cognition/confidence-estimate.v1.json",
+    "type": "object",
+    "required": ["schema_version", "estimate_id", "target_id", "target_type"],
+    "properties": {
+        "schema_version": {"const": COGNITIVE_SCHEMA_VERSION},
+        "estimate_id": {"type": "string", "minLength": 1},
+        "target_id": {"type": "string", "minLength": 1},
+        "target_type": {"type": "string", "minLength": 1},
+        "p_correct": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    },
+    "additionalProperties": True,
+}
+
+
+RATIONALE_CODE_SCHEMA: dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://dnc.local/schemas/cognition/rationale-code.v1.json",
+    "type": "object",
+    "required": ["schema_version", "code", "label"],
+    "properties": {
+        "schema_version": {"const": COGNITIVE_SCHEMA_VERSION},
+        "code": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+    },
+    "additionalProperties": True,
+}

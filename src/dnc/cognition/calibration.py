@@ -16,6 +16,7 @@ class CalibrationProfile:
     policy_version: str
     risk_thresholds: dict[RiskClass, float]
     evidence_summary: str = ""
+    capability_fingerprint: str | None = None
 
     def __post_init__(self) -> None:
         if not self.profile_id:
@@ -42,6 +43,7 @@ class CalibrationRegistry:
     """In-memory registry of calibration profiles."""
 
     _profiles: dict[str, CalibrationProfile] = field(default_factory=dict)
+    _invalidated: dict[str, str] = field(default_factory=dict)
 
     def register(self, profile: CalibrationProfile) -> None:
         """Register or replace a calibration profile by ID."""
@@ -51,7 +53,26 @@ class CalibrationRegistry:
     def get(self, profile_id: str) -> CalibrationProfile | None:
         """Return a profile by ID if present."""
 
+        if profile_id in self._invalidated:
+            return None
         return self._profiles.get(profile_id)
+
+    def invalidate_fingerprint(self, fingerprint: str, *, reason: str) -> tuple[str, ...]:
+        invalidated = tuple(
+            profile_id for profile_id, profile in self._profiles.items()
+            if profile.capability_fingerprint == fingerprint
+        )
+        for profile_id in invalidated:
+            self._invalidated[profile_id] = reason
+        return invalidated
+
+    def handle_model_change(self, event: object) -> None:
+        previous = getattr(event, "previous_fingerprint", "")
+        if previous:
+            self.invalidate_fingerprint(previous, reason="provider/model fingerprint changed")
+
+    def invalidation_reason(self, profile_id: str) -> str | None:
+        return self._invalidated.get(profile_id)
 
 
 def default_reference_calibration() -> CalibrationProfile:

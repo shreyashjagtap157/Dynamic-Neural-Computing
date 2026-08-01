@@ -29,6 +29,7 @@ from dnc.cognition.contracts import (
     TaskSpec,
 )
 from dnc.cognition.state import CognitiveState
+from dnc.kernel.errors import DNCPolicyError
 
 
 def export_cognitive_state(state: CognitiveState) -> str:
@@ -218,28 +219,76 @@ def migrate_phase3_draft_0(raw: dict[str, Any]) -> dict[str, Any]:
 def redacted_export(state: CognitiveState, allowed_labels: set[str]) -> str:
     """Export a state with records outside the allowed security labels removed."""
 
+    if not set(state.task.security_labels) <= allowed_labels:
+        raise DNCPolicyError("task security labels are outside the export scope")
     visible_item_ids = {
         item.item_id for item in state.epistemic_items if set(item.security_labels) <= allowed_labels
     }
+    visible_evidence_ids = {
+        item.evidence_id
+        for item in state.evidence
+        if set(getattr(item, "security_labels", ())) <= allowed_labels
+    }
+    visible_hypothesis_ids = {
+        item.hypothesis_id
+        for item in state.hypotheses
+        if set(item.security_labels) <= allowed_labels
+    }
+    visible_relation_ids = {
+        relation.relation_id
+        for relation in state.relations
+        if set(relation.security_labels) <= allowed_labels
+        and relation.source_id in visible_item_ids
+        and relation.target_id in visible_item_ids
+    }
+    hidden_ids = (
+        {item.item_id for item in state.epistemic_items} - visible_item_ids
+        | {item.evidence_id for item in state.evidence} - visible_evidence_ids
+        | {item.hypothesis_id for item in state.hypotheses} - visible_hypothesis_ids
+        | {item.relation_id for item in state.relations} - visible_relation_ids
+    )
+    safe_events = tuple(
+        event for event in state.event_log
+        if not _contains_hidden_identifier(event, hidden_ids)
+    )
     redacted = replace(
         state,
         epistemic_items=tuple(
             item for item in state.epistemic_items if item.item_id in visible_item_ids
         ),
-        evidence=tuple(item for item in state.evidence if set(getattr(item, "security_labels", ())) <= allowed_labels),
+        evidence=tuple(item for item in state.evidence if item.evidence_id in visible_evidence_ids),
         relations=tuple(
             relation for relation in state.relations
-            if set(relation.security_labels) <= allowed_labels
-            and relation.source_id in visible_item_ids
-            and relation.target_id in visible_item_ids
+            if relation.relation_id in visible_relation_ids
         ),
         hypotheses=tuple(
             hypothesis for hypothesis in state.hypotheses
-            if set(hypothesis.security_labels) <= allowed_labels
+            if hypothesis.hypothesis_id in visible_hypothesis_ids
         ),
         materialized_views={
             view_id: dependencies for view_id, dependencies in state.materialized_views.items()
             if set(dependencies) <= visible_item_ids
         },
+        invalidated_views=tuple(
+            view_id for view_id in state.invalidated_views
+            if view_id in state.materialized_views
+            and set(state.materialized_views[view_id]) <= visible_item_ids
+        ),
+        event_log=safe_events,
+        action_states={},
+        answer_state_id=(
+            state.answer_state_id if state.answer_state_id in visible_item_ids else None
+        ),
+        metadata={},
     )
     return json.dumps(canonical_data(redacted), sort_keys=True, separators=(",", ":"))
+
+
+def _contains_hidden_identifier(value: Any, hidden_ids: set[str]) -> bool:
+    if isinstance(value, str):
+        return value in hidden_ids
+    if isinstance(value, dict):
+        return any(_contains_hidden_identifier(item, hidden_ids) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return any(_contains_hidden_identifier(item, hidden_ids) for item in value)
+    return False

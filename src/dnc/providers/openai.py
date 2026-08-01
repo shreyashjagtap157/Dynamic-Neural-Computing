@@ -155,6 +155,10 @@ class OpenAIProvider(ExecutionProvider):
             payload["top_p"] = config["top_p"]
         if "response_format" in config:
             payload["response_format"] = config["response_format"]
+        if "tools" in config:
+            payload["tools"] = config["tools"]
+        if "tool_choice" in config:
+            payload["tool_choice"] = config["tool_choice"]
 
         url = f"{self._config.base_url}/chat/completions"
         body = json.dumps(payload).encode("utf-8")

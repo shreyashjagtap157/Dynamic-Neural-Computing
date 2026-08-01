@@ -12,7 +12,7 @@
 | `KER-002` | Complete | `dnc.kernel.versioning`; schema headers in `DNWIRSerializer`; compatibility tests |
 | `KER-003` | Complete | `tests/dnc_ir/test_golden_canonicalization.py` |
 | `KER-004` | Complete | `dnc.kernel.interfaces`; reference implementations remain in existing runtime modules |
-| `KER-005` | Complete | `docs/kernel/PHASE1-KERNEL-INVENTORY.md`; synthetic/reference labels preserved |
+| `KER-005` | Complete | Synthetic/reference labels plus `DNCSystemConfig.production_mode`, which requires an explicit backend and rejects reference execution unless expressly authorized |
 | `KER-006` | Complete | `dnc.kernel.errors` |
 | `KER-007` | Complete | `dnc.kernel.interfaces` |
 | `KER-008` | Complete | `docs/kernel/DEPENDENCY-PROFILES-LOCKS.md`; `pyproject.toml` profiles |
@@ -29,7 +29,7 @@
 - Minimal package builds reproducibly with `python tools/reproducible_build.py`;
   two independent builds produced byte-identical wheels and sdists.
 - Production-source Ruff gate passes.
-- Full pytest suite passes: `240/240`.
+- Full pytest suite passes: `255/255`, with one credential-gated live qualification skipped.
 - Phase 12 audit passes: `8/8`.
 - Phase 13 benchmark harness passes: `3/3`.
 - Architecture conformance remains conformant: `30/30` invariants and `34/34` conformance tests.

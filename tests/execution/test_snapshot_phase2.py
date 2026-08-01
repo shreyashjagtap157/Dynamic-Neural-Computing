@@ -86,7 +86,7 @@ def test_reference_snapshot_restore_preserves_graph_and_source_can_diverge() -> 
     assert "u3" in graph.units
     assert "u3" not in restored.units
     assert DNWIRSerializer.to_json(restored) == DNWIRSerializer.to_json(snapshot.graph)
-    assert snapshot.manifest.isolation_grade is IsolationGrade.I2_PROCESS_LOCAL
+    assert snapshot.manifest.isolation_grade is IsolationGrade.I1_GRAPH_ONLY
     assert snapshot.manifest.reproducibility_grade is ReproducibilityGrade.R2_DETERMINISTIC_CORE
 
 
@@ -261,6 +261,26 @@ def test_failed_restore_does_not_mutate_active_system_graph() -> None:
     assert DNWIRSerializer.to_json(system.graph) == before
 
 
+def test_tampered_runtime_state_is_rejected_without_mutating_system() -> None:
+    system = DNCSystem(execution_id="runtime-integrity")
+    snapshot = system.capture_execution_snapshot("snap-runtime")
+    tampered_runtime = dict(snapshot.runtime_state or {})
+    tampered_runtime["cycle_count"] = 999_999
+    tampered = type(snapshot)(
+        manifest=snapshot.manifest,
+        graph=snapshot.graph,
+        runtime_state=tampered_runtime,
+        provider_recordings=snapshot.provider_recordings,
+        effects=snapshot.effects,
+    )
+    before = system.snapshot()
+
+    with pytest.raises(ValueError, match="runtime state hash mismatch"):
+        system.restore_execution_snapshot(tampered)
+
+    assert system.snapshot() == before
+
+
 def test_shared_mutable_state_is_rejected() -> None:
     declarations = (
         SharedStateDeclaration("cache", SharedStateKind.CACHE, SharedStateAccess.SHARED_MUTABLE),
@@ -280,6 +300,8 @@ def test_default_mutable_state_audit_has_no_shared_mutable_entries() -> None:
     reject_unsafe_shared_state(declarations)
     assert {declaration.kind for declaration in declarations} >= {
         SharedStateKind.GRAPH,
+        SharedStateKind.COGNITIVE_STATE,
+        SharedStateKind.CAPABILITY_REGISTRY,
         SharedStateKind.RNG,
         SharedStateKind.PROVIDER_RESPONSES,
         SharedStateKind.FILESYSTEM,

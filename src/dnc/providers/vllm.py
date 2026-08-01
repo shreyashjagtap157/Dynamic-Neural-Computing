@@ -149,6 +149,12 @@ class vLLMProvider(ExecutionProvider):
             payload["top_p"] = config["top_p"]
         if "guided_decoding" in config:
             payload["guided_decoding"] = config["guided_decoding"]
+        if "response_format" in config:
+            payload["response_format"] = config["response_format"]
+        if "tools" in config:
+            payload["tools"] = config["tools"]
+        if "tool_choice" in config:
+            payload["tool_choice"] = config["tool_choice"]
 
         url = f"{self._config.base_url}/v1/chat/completions"
         body = json.dumps(payload).encode("utf-8")

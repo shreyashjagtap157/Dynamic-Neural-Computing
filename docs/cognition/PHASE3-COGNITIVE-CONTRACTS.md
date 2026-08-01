@@ -15,7 +15,7 @@ units without changing graph identity or DNC-IR hashes.
 
 | Work package | Status | Evidence |
 |---|---|---|
-| `COG-001` contracts and schemas | Complete | `src/dnc/cognition/contracts.py`; `src/dnc/cognition/canonical.py` JSON Schema 2020-12 dictionaries |
+| `COG-001` contracts and schemas | Complete | JSON Schema 2020-12 dictionaries cover tasks, epistemic items, evidence, relations, hypotheses, outcomes, confidence estimates, rationale codes, and aggregate state |
 | `COG-002` normalization and hashing | Complete | `canonical_json`, `canonical_hash`, `task_fingerprint`; tests prove DNC-IR hashes remain separate |
 | `COG-003` `TaskSpec` normalization and clarification | Complete | normalized objective, `ambiguous_task_fields`, `ClarificationRequest` |
 | `COG-004` append-only epistemic items and relations | Complete | `CognitiveState.with_epistemic_item`, `EvidenceRef`, `EpistemicRelation` |
@@ -25,7 +25,7 @@ units without changing graph identity or DNC-IR hashes.
 | `COG-008` DNC-IR references | Complete | `IRUnitReference`; cognitive hashes do not alter graph serialization |
 | `COG-009` invalidation/materialized views | Complete | dependency invalidation marks descendants/views stale without deleting history |
 | `COG-010` import/export and migration | Complete | lossless full-state `export_cognitive_state`/`import_cognitive_state`, legacy evidence compatibility, and `migrate_phase3_draft_0` |
-| `COG-011` redaction/security labels | Complete | tenant consistency checks and `redacted_export` tests |
+| `COG-011` redaction/security labels | Complete | tenant consistency, task export authorization, hidden-identifier event filtering, metadata/action clearing, and dependency-safe view redaction |
 
 ## Integration
 

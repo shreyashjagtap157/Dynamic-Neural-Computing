@@ -1,89 +1,56 @@
 from dnc.cognition import (
     CapabilityBroker,
     CapabilityCard,
+    CapabilityRequirement,
     CapabilityRegistry,
     CognitiveActionType,
     RiskClass,
 )
+from dnc.capabilities import HealthStatus
 
 
-def test_broker_selects_lowest_cost_matching_capability() -> None:
+def _card(capability_id: str, *, cost: float = 0.0, competence: float = 0.8) -> CapabilityCard:
+    return CapabilityCard(
+        capability_id=capability_id,
+        name=capability_id,
+        provider_id="test",
+        provider_version="1",
+        model_id=capability_id,
+        supported_actions=frozenset({CognitiveActionType.VERIFY}),
+        risk_limit=RiskClass.HIGH,
+        permissions=frozenset({"read"}),
+        competence=competence,
+        cost_per_call=cost,
+        health=HealthStatus.HEALTHY,
+        fingerprint=capability_id,
+    )
+
+
+def test_cognition_facade_uses_phase4_registry_and_broker() -> None:
     registry = CapabilityRegistry()
-    registry.register(
-        CapabilityCard(
-            capability_id="expensive-verifier",
-            name="Expensive verifier",
-            supported_actions=frozenset({CognitiveActionType.VERIFY}),
-            risk_limit=RiskClass.HIGH,
-            cost_per_call=3.0,
-        )
-    )
-    registry.register(
-        CapabilityCard(
-            capability_id="cheap-verifier",
-            name="Cheap verifier",
-            supported_actions=frozenset({CognitiveActionType.VERIFY}),
-            risk_limit=RiskClass.HIGH,
-            cost_per_call=1.0,
-        )
-    )
-
-    match = CapabilityBroker(registry).match(CognitiveActionType.VERIFY, RiskClass.MEDIUM)
-
-    assert match.satisfied is True
-    assert match.capability.capability_id == "cheap-verifier"
-
-
-def test_broker_rejects_degraded_capabilities() -> None:
-    registry = CapabilityRegistry()
-    registry.register(
-        CapabilityCard(
-            capability_id="degraded-retriever",
-            name="Retriever",
-            supported_actions=frozenset({CognitiveActionType.RETRIEVE}),
-            risk_limit=RiskClass.MEDIUM,
-            degraded=True,
-        )
-    )
-
-    match = CapabilityBroker(registry).match(CognitiveActionType.RETRIEVE, RiskClass.LOW)
-
-    assert match.satisfied is False
-    assert match.capability is None
-
-
-def test_broker_requires_permissions() -> None:
-    registry = CapabilityRegistry()
-    registry.register(
-        CapabilityCard(
-            capability_id="read-only-retriever",
-            name="Read-only retriever",
-            supported_actions=frozenset({CognitiveActionType.RETRIEVE}),
-            risk_limit=RiskClass.MEDIUM,
-            permissions=frozenset({"read"}),
-        )
-    )
+    registry.register(_card("expensive", cost=3.0))
+    registry.register(_card("cheap", cost=1.0))
 
     match = CapabilityBroker(registry).match(
-        CognitiveActionType.RETRIEVE,
-        RiskClass.LOW,
-        required_permissions=frozenset({"read", "network"}),
+        CapabilityRequirement(CognitiveActionType.VERIFY, RiskClass.MEDIUM)
     )
 
-    assert match.satisfied is False
+    assert match.satisfied
+    assert match.selected.capability_id == "cheap"
 
 
-def test_broker_requires_risk_limit_to_cover_task_risk() -> None:
+def test_cognition_facade_broker_enforces_permissions_and_competence() -> None:
     registry = CapabilityRegistry()
-    registry.register(
-        CapabilityCard(
-            capability_id="low-risk-asker",
-            name="Low risk asker",
-            supported_actions=frozenset({CognitiveActionType.ASK}),
-            risk_limit=RiskClass.LOW,
+    registry.register(_card("limited", competence=0.4))
+
+    match = CapabilityBroker(registry).match(
+        CapabilityRequirement(
+            CognitiveActionType.VERIFY,
+            RiskClass.HIGH,
+            required_permissions=frozenset({"read", "network"}),
+            minimum_competence=0.9,
         )
     )
 
-    match = CapabilityBroker(registry).match(CognitiveActionType.ASK, RiskClass.HIGH)
-
-    assert match.satisfied is False
+    assert not match.satisfied
+    assert set(match.rejections[0].reason_codes) >= {"PERMISSIONS_MISSING", "COMPETENCE_LOW"}

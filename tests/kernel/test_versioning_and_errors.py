@@ -1,3 +1,5 @@
+import pytest
+
 from dnc.kernel import (
     DNCError,
     DNCValidationError,
@@ -6,6 +8,7 @@ from dnc.kernel import (
     KERNEL_COMPATIBILITY_VERSION,
 )
 from dnc.kernel.versioning import schema_header
+from dnc.system import DNCSystem, DNCSystemConfig, ReferenceExecutionCore
 
 
 def test_schema_header_exposes_version_identifiers() -> None:
@@ -18,3 +21,19 @@ def test_schema_header_exposes_version_identifiers() -> None:
 
 def test_error_taxonomy_uses_common_base_class() -> None:
     assert issubclass(DNCValidationError, DNCError)
+
+
+def test_production_mode_rejects_unapproved_synthetic_execution() -> None:
+    with pytest.raises(ValueError, match="explicit non-synthetic"):
+        DNCSystem(config=DNCSystemConfig(production_mode=True))
+    with pytest.raises(ValueError, match="synthetic reference execution"):
+        DNCSystem(
+            config=DNCSystemConfig(production_mode=True),
+            execution_core=ReferenceExecutionCore(),
+        )
+
+    approved = DNCSystem(
+        config=DNCSystemConfig(production_mode=True, allow_synthetic_execution=True),
+        execution_core=ReferenceExecutionCore(),
+    )
+    assert isinstance(approved.execution_core, ReferenceExecutionCore)

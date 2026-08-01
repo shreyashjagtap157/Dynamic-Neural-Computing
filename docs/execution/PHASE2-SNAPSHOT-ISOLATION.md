@@ -38,13 +38,18 @@ Isolation:
 
 - `I0_NONE`: no isolation claim;
 - `I1_GRAPH_ONLY`: graph clone only;
-- `I2_PROCESS_LOCAL`: process-local deterministic state is isolated;
+- `I1_GRAPH_ONLY`: transactional in-process DNC state clone;
+- `I2_PROCESS_LOCAL`: dedicated-process local state isolation;
 - `I3_RECORDED_EXTERNALS`: external interactions are recorded/replayed;
 - `I4_SANDBOXED_ENVIRONMENT`: filesystem/network/process isolation is qualified.
 
 ## Current reference limitation
 
-`ReferenceSnapshotManager.capture_graph` provides `R2_DETERMINISTIC_CORE` and `I2_PROCESS_LOCAL` for DNC-IR graph plus optional runtime-state dictionaries. It explicitly declares uncaptured provider responses, filesystem, database, network, accelerator, and process-environment state.
+`ReferenceSnapshotManager.capture_graph` provides `R2_DETERMINISTIC_CORE` and
+`I1_GRAPH_ONLY` for DNC-IR graph plus optional runtime-state dictionaries. It
+does not claim dedicated-process isolation. It explicitly declares uncaptured
+provider responses, filesystem, database, network, accelerator, and
+process-environment state.
 
 This prevents a graph-only clone from being mislabeled as a same-state counterfactual.
 

@@ -1,7 +1,7 @@
 # SBOM and Build Provenance
 
 **Date:** 2026-07-31
-**Phase:** Phase 3
+**Phase:** Phase 4
 
 ## Build command
 
@@ -21,8 +21,8 @@ Artifacts were generated, hash-recorded, and then removed from the working tree.
 
 | Artifact | SHA256 |
 |---|---|
-| `dynamic_neural_computing-0.1.0.dev0-py3-none-any.whl` | `25F7FFD76D11E1B63728530C8C40101C6771238BB4A980348FC4F14EC323CAD7` |
-| `dynamic_neural_computing-0.1.0.dev0.tar.gz` | `B77CD5BDFC16E88D3A68C6CC6AE3D2195FE1DF96F044889199BB848F083FEEA6` |
+| `dynamic_neural_computing-0.1.0.dev0-py3-none-any.whl` | `53153673DCC5D4EA0A8A5DF58D55874B7A69C5CA36936B951D2C6B2691FB8C7A` |
+| `dynamic_neural_computing-0.1.0.dev0.tar.gz` | `D3976C5ADBF2CC42B75B752E4C99214453FCDA5FDA56E0DC3CDFD90C2D5A2CE2` |
 
 Two independent builds produced these same hashes for both artifacts.
 

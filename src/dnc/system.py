@@ -10,6 +10,10 @@ import copy
 from dataclasses import dataclass
 from typing import Optional, Protocol
 
+from dnc.capabilities.broker import CapabilityBroker
+from dnc.capabilities.contracts import CapabilityRequirement, CapabilitySelection
+from dnc.capabilities.registry import CapabilityRegistry
+from dnc.cognition.migration import export_cognitive_state, import_cognitive_state
 from dnc.cognition.state import CognitiveState
 from dnc.dcc.assessment_engine import Assessment, AssessmentEngine, ExecutionResult
 from dnc.dcc.computation_generator import (
@@ -66,6 +70,8 @@ class DNCSystemConfig:
     enable_learning: bool = True
     enable_mutation: bool = True
     enable_provenance: bool = True
+    production_mode: bool = False
+    allow_synthetic_execution: bool = False
 
 
 @dataclass(frozen=True)
@@ -95,6 +101,7 @@ class DNCSystem:
         execution_core: Optional[ExecutionCore] = None,
         initial_graph: Optional[StructuralGraph] = None,
         cognitive_state: Optional[CognitiveState] = None,
+        capability_registry: Optional[CapabilityRegistry] = None,
     ) -> None:
         self.execution_id = execution_id
         self.config = config or DNCSystemConfig()
@@ -115,8 +122,18 @@ class DNCSystem:
         )
         self.projector = StructuralProjector()
         self.snapshot_manager = ReferenceSnapshotManager()
-        self.execution_core = execution_core or ReferenceExecutionCore()
+        if self.config.production_mode and execution_core is None:
+            raise ValueError("production mode requires an explicit non-synthetic execution core")
+        selected_core = execution_core or ReferenceExecutionCore()
+        if (
+            self.config.production_mode
+            and isinstance(selected_core, ReferenceExecutionCore)
+            and not self.config.allow_synthetic_execution
+        ):
+            raise ValueError("synthetic reference execution is disabled in production mode")
+        self.execution_core = selected_core
         self.cognitive_state = cognitive_state
+        self.capability_registry = capability_registry or CapabilityRegistry()
         self.assessment_engine = AssessmentEngine()
         self.generator = ComputationGenerator()
         self.controller = StructuralController()
@@ -153,7 +170,7 @@ class DNCSystem:
         )
 
     def capture_execution_snapshot(self, snapshot_id: str) -> Snapshot:
-        """Capture process-local graph and lifecycle counters for Phase 2 replay."""
+        """Capture integrated graph, cognition, capabilities, and lifecycle state."""
 
         return self.snapshot_manager.capture_graph(
             self.graph,
@@ -163,6 +180,12 @@ class DNCSystem:
                 "cognitive_state_hash": (
                     self.cognitive_state.canonical_hash() if self.cognitive_state is not None else None
                 ),
+                "cognitive_state": (
+                    export_cognitive_state(self.cognitive_state)
+                    if self.cognitive_state is not None
+                    else None
+                ),
+                "capability_registry": self.capability_registry.snapshot_state(),
                 "cycle_count": self._cycle_count,
                 "proposals_generated": self._proposals_generated,
                 "proposals_authorized": self._proposals_authorized,
@@ -187,36 +210,77 @@ class DNCSystem:
             raise ValueError("updated cognitive state MUST belong to the active task")
         self.cognitive_state = state
 
-    def restore_execution_snapshot(self, snapshot: Snapshot) -> None:
-        """Restore graph and lifecycle counters from a process-local snapshot."""
+    def select_capability(
+        self, requirement: CapabilityRequirement, *, now_ns: int | None = None
+    ) -> CapabilitySelection:
+        """Select an available Phase 4 capability through the canonical system."""
 
-        self.graph = self.snapshot_manager.restore_graph(snapshot)
+        return CapabilityBroker(self.capability_registry).match(requirement, now_ns=now_ns)
+
+    def restore_execution_snapshot(self, snapshot: Snapshot) -> None:
+        """Atomically restore integrated process-local state from a snapshot."""
+
+        restored_graph = self.snapshot_manager.restore_graph(snapshot)
         runtime_state = snapshot.runtime_state or {}
-        self._cycle_count = int(runtime_state.get("cycle_count", self._cycle_count))
-        self._proposals_generated = int(
-            runtime_state.get("proposals_generated", self._proposals_generated)
+        cognitive_payload = runtime_state.get("cognitive_state")
+        restored_cognitive_state = (
+            import_cognitive_state(cognitive_payload) if cognitive_payload is not None else None
         )
-        self._proposals_authorized = int(
-            runtime_state.get("proposals_authorized", self._proposals_authorized)
+        expected_cognitive_hash = runtime_state.get("cognitive_state_hash")
+        restored_cognitive_hash = (
+            restored_cognitive_state.canonical_hash()
+            if restored_cognitive_state is not None
+            else None
         )
-        self._transaction_commits = int(
-            runtime_state.get("transaction_commits", self._transaction_commits)
-        )
-        self._transaction_rollbacks = int(
-            runtime_state.get("transaction_rollbacks", self._transaction_rollbacks)
-        )
-        self._cycles_since_mutation = int(
-            runtime_state.get("cycles_since_mutation", self._cycles_since_mutation)
-        )
-        self._recent_mutation_count = int(
-            runtime_state.get("recent_mutation_count", self._recent_mutation_count)
-        )
-        self._prior_mutation_harmed = bool(
-            runtime_state.get("prior_mutation_harmed", self._prior_mutation_harmed)
-        )
-        self._last_observed_utility = float(
-            runtime_state.get("last_observed_utility", self._last_observed_utility)
-        )
+        if expected_cognitive_hash != restored_cognitive_hash:
+            raise ValueError("snapshot cognitive state hash mismatch")
+
+        restored_registry = CapabilityRegistry()
+        registry_state = runtime_state.get("capability_registry")
+        if registry_state is not None:
+            restored_registry.restore_state(registry_state)
+
+        restored_counters = {
+            "cycle_count": int(runtime_state.get("cycle_count", self._cycle_count)),
+            "proposals_generated": int(
+                runtime_state.get("proposals_generated", self._proposals_generated)
+            ),
+            "proposals_authorized": int(
+                runtime_state.get("proposals_authorized", self._proposals_authorized)
+            ),
+            "transaction_commits": int(
+                runtime_state.get("transaction_commits", self._transaction_commits)
+            ),
+            "transaction_rollbacks": int(
+                runtime_state.get("transaction_rollbacks", self._transaction_rollbacks)
+            ),
+            "cycles_since_mutation": int(
+                runtime_state.get("cycles_since_mutation", self._cycles_since_mutation)
+            ),
+            "recent_mutation_count": int(
+                runtime_state.get("recent_mutation_count", self._recent_mutation_count)
+            ),
+            "prior_mutation_harmed": bool(
+                runtime_state.get("prior_mutation_harmed", self._prior_mutation_harmed)
+            ),
+            "last_observed_utility": float(
+                runtime_state.get("last_observed_utility", self._last_observed_utility)
+            ),
+        }
+
+        self.graph = restored_graph
+        self.cognitive_state = restored_cognitive_state
+        if registry_state is not None:
+            self.capability_registry.restore_state(restored_registry.snapshot_state())
+        self._cycle_count = restored_counters["cycle_count"]
+        self._proposals_generated = restored_counters["proposals_generated"]
+        self._proposals_authorized = restored_counters["proposals_authorized"]
+        self._transaction_commits = restored_counters["transaction_commits"]
+        self._transaction_rollbacks = restored_counters["transaction_rollbacks"]
+        self._cycles_since_mutation = restored_counters["cycles_since_mutation"]
+        self._recent_mutation_count = restored_counters["recent_mutation_count"]
+        self._prior_mutation_harmed = restored_counters["prior_mutation_harmed"]
+        self._last_observed_utility = restored_counters["last_observed_utility"]
 
     def run_cycle(
         self,

@@ -3,17 +3,22 @@ import json
 import pytest
 
 from dnc.cognition import (
+    ACTION_OUTCOME_SCHEMA,
     ActionLifecycleState,
     ClarificationRequest,
     CognitiveState,
+    CONFIDENCE_ESTIMATE_SCHEMA,
     EpistemicItem,
     EpistemicRelation,
     EpistemicStatus,
+    EPISTEMIC_RELATION_SCHEMA,
     EvidenceRef,
     EvidenceSourceType,
+    EVIDENCE_REF_SCHEMA,
     GoalInvariant,
     Hypothesis,
     HypothesisStatus,
+    HYPOTHESIS_SCHEMA,
     IRUnitReference,
     InvalidationStatus,
     OutcomeLifecycleState,
@@ -21,6 +26,7 @@ from dnc.cognition import (
     RelationType,
     RiskClass,
     RationaleCode,
+    RATIONALE_CODE_SCHEMA,
     TaskSpec,
     ambiguous_task_fields,
     canonical_hash,
@@ -251,6 +257,24 @@ def test_import_export_migration_and_redaction_preserve_tenant_labels() -> None:
 
     assert restored.task.tenant_id == "tenant-a"
     assert [item["item_id"] for item in redacted["epistemic_items"]] == ["public-claim"]
+    assert "secret-claim" not in json.dumps(redacted)
+
+
+def test_redaction_removes_hidden_identifiers_from_event_log() -> None:
+    secret = EpistemicItem(
+        item_id="secret-claim",
+        status=EpistemicStatus.ASSUMPTION,
+        content="Secret assumption",
+        tenant_id="tenant-a",
+        security_labels=("secret",),
+    )
+    state = CognitiveState(task=_task()).with_epistemic_item(secret)
+    state = state.invalidate_from("secret-claim", reason="secret source retracted")
+
+    payload = redacted_export(state, {"public"})
+
+    assert "secret-claim" not in payload
+    assert "secret source retracted" not in payload
 
 
 def test_full_state_and_legacy_evidence_round_trip_without_loss() -> None:
@@ -291,6 +315,22 @@ def test_set_canonicalization_is_order_independent() -> None:
     assert canonical_hash({"values": {"a", "b", "c"}}) == canonical_hash(
         {"values": {"c", "b", "a"}}
     )
+
+
+def test_phase3_boundary_schemas_cover_all_canonical_record_types() -> None:
+    schemas = (
+        EVIDENCE_REF_SCHEMA,
+        EPISTEMIC_RELATION_SCHEMA,
+        HYPOTHESIS_SCHEMA,
+        ACTION_OUTCOME_SCHEMA,
+        CONFIDENCE_ESTIMATE_SCHEMA,
+        RATIONALE_CODE_SCHEMA,
+    )
+
+    for schema in schemas:
+        assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+        assert schema["required"]
+        assert schema["properties"]["schema_version"]
 
 
 def test_phase3_system_integration_does_not_mutate_graph_identity() -> None:

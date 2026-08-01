@@ -56,6 +56,8 @@ class SharedStateKind(str, Enum):
 
     GRAPH = "GRAPH"
     RUNTIME_STATE = "RUNTIME_STATE"
+    COGNITIVE_STATE = "COGNITIVE_STATE"
+    CAPABILITY_REGISTRY = "CAPABILITY_REGISTRY"
     MODEL_PARAMETERS = "MODEL_PARAMETERS"
     OPTIMIZER_STATE = "OPTIMIZER_STATE"
     SAMPLER_STATE = "SAMPLER_STATE"
@@ -245,6 +247,14 @@ def default_mutable_state_audit() -> tuple[SharedStateDeclaration, ...]:
         SharedStateDeclaration("graph", SharedStateKind.GRAPH, SharedStateAccess.ISOLATED),
         SharedStateDeclaration(
             "runtime_state", SharedStateKind.RUNTIME_STATE, SharedStateAccess.ISOLATED
+        ),
+        SharedStateDeclaration(
+            "cognitive_state", SharedStateKind.COGNITIVE_STATE, SharedStateAccess.ISOLATED
+        ),
+        SharedStateDeclaration(
+            "capability_registry",
+            SharedStateKind.CAPABILITY_REGISTRY,
+            SharedStateAccess.ISOLATED,
         ),
         SharedStateDeclaration(
             "model_parameters", SharedStateKind.MODEL_PARAMETERS, SharedStateAccess.ISOLATED
@@ -514,7 +524,7 @@ class ReferenceSnapshotManager:
             snapshot_id=snapshot_id,
             source_state_id=source_state_id,
             reproducibility_grade=ReproducibilityGrade.R2_DETERMINISTIC_CORE,
-            isolation_grade=IsolationGrade.I2_PROCESS_LOCAL,
+            isolation_grade=IsolationGrade.I1_GRAPH_ONLY,
             graph_hash=_hash_text(graph_json),
             runtime_state_hash=runtime_hash,
             captured_state=("graph",) + (("runtime_state",) if runtime_state is not None else ()),
@@ -543,6 +553,12 @@ class ReferenceSnapshotManager:
         restored_hash = _hash_text(DNWIRSerializer.to_json(restored))
         if restored_hash != snapshot.manifest.graph_hash:
             raise ValueError("snapshot graph hash mismatch")
+        expected_runtime_hash = snapshot.manifest.runtime_state_hash
+        actual_runtime_hash = (
+            _hash_json(snapshot.runtime_state) if snapshot.runtime_state is not None else None
+        )
+        if actual_runtime_hash != expected_runtime_hash:
+            raise ValueError("snapshot runtime state hash mismatch")
         return restored
 
 

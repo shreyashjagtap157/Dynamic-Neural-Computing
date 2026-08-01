@@ -1,11 +1,5 @@
 """Cognitive-runtime contracts for the expanded DNC profile."""
 
-from dnc.cognition.capabilities import (
-    CapabilityBroker,
-    CapabilityCard,
-    CapabilityMatch,
-    CapabilityRegistry,
-)
 from dnc.cognition.calibration import (
     CalibrationProfile,
     CalibrationRegistry,
@@ -50,7 +44,13 @@ from dnc.cognition.canonical import (
     COGNITIVE_SCHEMA_ID,
     COGNITIVE_SCHEMA_VERSION,
     COGNITIVE_STATE_SCHEMA,
+    ACTION_OUTCOME_SCHEMA,
+    CONFIDENCE_ESTIMATE_SCHEMA,
+    EPISTEMIC_RELATION_SCHEMA,
     EPISTEMIC_ITEM_SCHEMA,
+    EVIDENCE_REF_SCHEMA,
+    HYPOTHESIS_SCHEMA,
+    RATIONALE_CODE_SCHEMA,
     TASK_SPEC_SCHEMA,
     ambiguous_task_fields,
     canonical_hash,
@@ -73,11 +73,13 @@ from dnc.cognition.state import (
 __all__ = [
     "ActionLifecycleState",
     "ActionOutcome",
+    "ACTION_OUTCOME_SCHEMA",
     "COGNITIVE_SCHEMA_ID",
     "COGNITIVE_SCHEMA_VERSION",
     "CapabilityBroker",
     "CapabilityCard",
-    "CapabilityMatch",
+    "CapabilityRequirement",
+    "CapabilitySelection",
     "CapabilityRegistry",
     "CalibrationProfile",
     "CalibrationRegistry",
@@ -92,18 +94,22 @@ __all__ = [
     "CognitiveState",
     "COGNITIVE_STATE_SCHEMA",
     "ConfidenceEstimate",
+    "CONFIDENCE_ESTIMATE_SCHEMA",
     "EPISTEMIC_ITEM_SCHEMA",
+    "EPISTEMIC_RELATION_SCHEMA",
     "EpistemicItem",
     "EpistemicRelation",
     "EpistemicStatus",
     "EvidenceRef",
     "EvidenceSourceType",
     "EvidenceItem",
+    "EVIDENCE_REF_SCHEMA",
     "GoalInvariant",
     "HaltingDecision",
     "HaltingDecisionType",
     "Hypothesis",
     "HypothesisStatus",
+    "HYPOTHESIS_SCHEMA",
     "IRUnitReference",
     "InvalidationStatus",
     "NoOpDecision",
@@ -111,6 +117,7 @@ __all__ = [
     "OutcomeLifecycleState",
     "PolicyContext",
     "RationaleCode",
+    "RATIONALE_CODE_SCHEMA",
     "ReferenceCognitiveController",
     "RelationType",
     "RiskClass",
@@ -131,3 +138,17 @@ __all__ = [
     "validate_outcome_transition",
     "validate_task_transition",
 ]
+
+
+def __getattr__(name: str):
+    if name in {
+        "CapabilityBroker",
+        "CapabilityCard",
+        "CapabilityRegistry",
+        "CapabilityRequirement",
+        "CapabilitySelection",
+    }:
+        from dnc import capabilities
+
+        return getattr(capabilities, name)
+    raise AttributeError(name)

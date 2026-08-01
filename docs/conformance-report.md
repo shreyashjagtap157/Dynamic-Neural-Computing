@@ -1,7 +1,7 @@
 # Architecture Conformance Report
 
 Version: 1.0
-Generated: 2026-07-31
+Generated: 2026-08-01
 Implementation source: repository state at generation time
 Implementation version: 0.1.0
 
