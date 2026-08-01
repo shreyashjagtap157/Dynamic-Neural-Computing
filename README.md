@@ -118,5 +118,6 @@ dependencies and optional future backend integrations are declared through
 - [Documentation index](docs/README.md)
 - [Current status](docs/project/REPOSITORY-STATUS.md)
 - [M1 SDK and plugin usage](docs/project/M1-SDK-USAGE.md)
+- [M1 robustness report](docs/roadmap/M1-ROBUSTNESS-REPORT.md)
 - [User questions and research assessments](docs/research/USER-QUESTIONS-AND-ASSESSMENTS.md)
 - [Enterprise platform roadmap](docs/roadmap/ENTERPRISE-PLATFORM-ROADMAP.md)

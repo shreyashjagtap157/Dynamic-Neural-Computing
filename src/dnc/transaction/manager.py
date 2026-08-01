@@ -4,6 +4,8 @@ Orchestrates ACID transactions for DNC structural mutations with OCC, rollback, 
 """
 
 import copy
+import weakref
+from threading import RLock
 from typing import List, Tuple, Optional
 from dnc.ir.graph import StructuralGraph
 from dnc.ir.operations import IROperation
@@ -12,6 +14,29 @@ from dnc.mutation.engine import MutationEngine
 from dnc.ir.identity import TransactionID, GraphVersion
 from dnc.observability.provenance import ProvenanceLog, EventType
 from .context import TransactionContext, TransactionState
+
+_GRAPH_LOCKS_GUARD = RLock()
+_GRAPH_LOCKS: dict[int, tuple[weakref.ReferenceType[StructuralGraph], RLock]] = {}
+
+
+def _graph_lock(graph: StructuralGraph) -> RLock:
+    key = id(graph)
+    with _GRAPH_LOCKS_GUARD:
+        current = _GRAPH_LOCKS.get(key)
+        if current is not None and current[0]() is graph:
+            return current[1]
+
+        def release(reference: weakref.ReferenceType[StructuralGraph]) -> None:
+            with _GRAPH_LOCKS_GUARD:
+                registered = _GRAPH_LOCKS.get(key)
+                if registered is not None and registered[0] is reference:
+                    _GRAPH_LOCKS.pop(key, None)
+
+        reference = weakref.ref(graph, release)
+        lock = RLock()
+        _GRAPH_LOCKS[key] = (reference, lock)
+        return lock
+
 
 class TransactionManager:
     """
@@ -24,6 +49,10 @@ class TransactionManager:
         self.provenance_log = provenance_log
 
     def execute_transaction(self, graph: StructuralGraph, operations: List[IROperation], base_version: Optional[GraphVersion] = None) -> Tuple[bool, TransactionContext]:
+        with _graph_lock(graph):
+            return self._execute_transaction(graph, operations, base_version)
+
+    def _execute_transaction(self, graph: StructuralGraph, operations: List[IROperation], base_version: Optional[GraphVersion] = None) -> Tuple[bool, TransactionContext]:
         tx_id = TransactionID()
         expected_version = base_version or graph.version
         
@@ -76,9 +105,19 @@ class TransactionManager:
         # 3. VALIDATE and APPLY operations on staging graph
         ctx.state = TransactionState.APPLYING
         for op in operations:
-            if not op.validate():
+            try:
+                operation_valid = isinstance(op, IROperation) and op.validate()
+            except Exception as exc:
+                operation_valid = False
+                validation_detail = f": {exc}"
+            else:
+                validation_detail = ""
+            if not operation_valid:
                 ctx.state = TransactionState.ROLLING_BACK
-                ctx.error_message = f"Operation validation failed for {op.op_type}"
+                operation_type = getattr(op, "op_type", type(op).__name__)
+                ctx.error_message = (
+                    f"Operation validation failed for {operation_type}{validation_detail}"
+                )
                 self._rollback_staging(graph, staging_graph, ctx)
                 if self.provenance_log is not None:
                     self.provenance_log.append(
@@ -109,8 +148,7 @@ class TransactionManager:
             if not success:
                 ctx.state = TransactionState.ROLLING_BACK
                 ctx.error_message = f"Mutation application failed: {warns}"
-                self.mutation_engine.rollback(staging_graph, ctx.undo_log)
-                ctx.state = TransactionState.ROLLED_BACK
+                self._rollback_staging(graph, staging_graph, ctx)
                 if self.provenance_log is not None:
                     self.provenance_log.append(
                         event_type=EventType.STRUCTURAL_TRANSACTION_ROLLED_BACK,
@@ -139,8 +177,7 @@ class TransactionManager:
         if not val_res.is_valid:
             ctx.state = TransactionState.ROLLING_BACK
             ctx.error_message = f"Structural invariant violation after mutation: {val_res.errors}"
-            self.mutation_engine.rollback(staging_graph, ctx.undo_log)
-            ctx.state = TransactionState.ROLLED_BACK
+            self._rollback_staging(graph, staging_graph, ctx)
             if self.provenance_log is not None:
                 self.provenance_log.append(
                     event_type=EventType.STRUCTURAL_TRANSACTION_ROLLED_BACK,
@@ -174,6 +211,12 @@ class TransactionManager:
 
         return True, ctx
 
-    def _rollback_staging(self, active_graph: StructuralGraph, staging_graph: StructuralGraph, ctx: TransactionContext) -> None:
-        self.mutation_engine.rollback(staging_graph, ctx.undo_log)
-        ctx.state = TransactionState.ROLLED_BACK
+    def _rollback_staging(self, _active_graph: StructuralGraph, staging_graph: StructuralGraph, ctx: TransactionContext) -> None:
+        try:
+            self.mutation_engine.rollback(staging_graph, ctx.undo_log)
+        except Exception as exc:
+            original = ctx.error_message or "transaction failed"
+            ctx.error_message = f"{original}; staging rollback failed: {exc}"
+            ctx.state = TransactionState.FAILED
+        else:
+            ctx.state = TransactionState.ROLLED_BACK

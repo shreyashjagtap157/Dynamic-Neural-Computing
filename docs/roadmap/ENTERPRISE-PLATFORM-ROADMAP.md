@@ -25,14 +25,14 @@ DNC will be a substrate-neutral, governed runtime for dynamically constructing, 
 - accurate generated status/conformance evidence;
 - one canonical runtime extracted from phase scripts.
 
-### M1 — Reliable generic runtime — IN PROGRESS
+### M1 — Reliable generic runtime — COMPLETE
 
 - versioned Generic DNC-IR and schemas — **COMPLETE (`M1-IR-001`)**;
 - validated ports and data/control/state/resource edges — **COMPLETE (`M1-IR-002`)**;
 - idempotency, side-effect, placement, and security contracts — **COMPLETE (`M1-IR-003`)**;
 - atomic transaction/rollback and explicit replay grades — **COMPLETE (`M1-RT-001`)**;
 - plugin SDK, CLI, Python SDK, artifact and graph registry — **COMPLETE (`M1-SDK-001`)**;
-- property, fuzz, concurrency, failure, and compatibility tests.
+- property, fuzz, concurrency, failure, and compatibility tests — **COMPLETE (`M1-QA-001`)**.
 
 `M1-IR-001` adds a packaged canonical JSON Schema, strict semantic-version and
 compatibility-header validation, dependency-free envelope validation, explicit rejection of
@@ -51,8 +51,10 @@ fresh-runtime replay, and admits R2–R4 only from matching snapshot evidence.
 `M1-SDK-001` adds a packaged versioned plugin-manifest contract, fingerprint-pinned least-authority
 loading, a stable Python SDK facade, a machine-readable graph CLI, and tenant-scoped content-addressed
 artifact/graph registries with repeated schema and governance admission.
-The next dependency-ordered point is `M1-QA-001`: property, fuzz, concurrency, failure, and
-compatibility tests for the complete M1 surface.
+`M1-QA-001` adds reproducible generated and malformed-input campaigns, shared-graph OCC and registry
+thread-safety, injected storage/plugin/rollback failures, explicit IR/snapshot/plugin compatibility
+matrices, and retained regression cases for every discovered defect. M1 is complete at the reliable
+process-local generic-runtime boundary; M2 begins real model/tool/retrieval execution work.
 
 ### M2 — Real LLM reasoning runtime
 

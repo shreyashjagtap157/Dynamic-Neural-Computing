@@ -17,7 +17,7 @@ reference implementations unless their deployment profiles explicitly bind quali
 
 ## Current verified baseline
 
-- The authoritative pytest suite passes **464 tests**, with **2 intentional environment-dependent skips**.
+- The authoritative pytest suite passes **515 tests**, with **2 intentional environment-dependent skips**.
 - The Phase 12 canonical lifecycle audit passes **8/8**.
 - The Phase 13 benchmark harness integrity audit passes **3/3**.
 - Production source passes Ruff and Python byte-compilation.
@@ -72,6 +72,9 @@ Test success establishes the implemented behavior only. It does not establish em
 24. Added the stable Python SDK and graph CLI, packaged a versioned fingerprint-pinned plugin
     contract, and built tenant-scoped content-addressed artifact/graph registries with repeated
     governance admission.
+25. Completed deterministic property and malformed-input fuzzing, process-local concurrency and
+    injected-failure gates, explicit compatibility matrices, shared-graph OCC locking, and strict
+    identity ingress validation for the M1 reliable generic runtime.
 
 ## Known critical gaps
 

@@ -16,6 +16,7 @@ dnc = "dnc.cli:main"
 
 [project.optional-dependencies]
 dev = [
+  "hypothesis>=6.136.9,<7",
   "pytest>=8",
   "pytest-cov>=5",
   "ruff>=0.9",

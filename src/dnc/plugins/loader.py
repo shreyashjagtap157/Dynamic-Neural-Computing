@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Callable
+from threading import RLock
 from typing import Any
 
-from dnc.kernel.errors import DNCValidationError
+from dnc.kernel.errors import DNCCapabilityError, DNCError, DNCValidationError
 from dnc.plugins.contracts import DNCPlugin, PluginLoadPolicy, PluginManifest
 
 PluginResolver = Callable[[str], object]
@@ -19,25 +20,29 @@ class PluginRegistry:
         self._policy = policy
         self._manifests: dict[str, PluginManifest] = {}
         self._fingerprints: dict[str, str] = {}
+        self._lock = RLock()
 
     def register(self, manifest: PluginManifest) -> None:
         self._policy.admit(manifest)
-        if manifest.plugin_id in self._manifests:
-            raise DNCValidationError(f"plugin already registered: {manifest.plugin_id}")
-        self._manifests[manifest.plugin_id] = manifest
-        self._fingerprints[manifest.plugin_id] = manifest.fingerprint
+        with self._lock:
+            if manifest.plugin_id in self._manifests:
+                raise DNCValidationError(f"plugin already registered: {manifest.plugin_id}")
+            self._manifests[manifest.plugin_id] = manifest
+            self._fingerprints[manifest.plugin_id] = manifest.fingerprint
 
     def manifest(self, plugin_id: str) -> PluginManifest:
-        try:
-            manifest = self._manifests[plugin_id]
-        except KeyError as error:
-            raise KeyError(f"unknown plugin: {plugin_id}") from error
-        if manifest.fingerprint != self._fingerprints[plugin_id]:
-            raise DNCValidationError("registered plugin manifest changed after admission")
-        return manifest
+        with self._lock:
+            try:
+                manifest = self._manifests[plugin_id]
+            except KeyError as error:
+                raise KeyError(f"unknown plugin: {plugin_id}") from error
+            if manifest.fingerprint != self._fingerprints[plugin_id]:
+                raise DNCValidationError("registered plugin manifest changed after admission")
+            return manifest
 
     def all(self) -> tuple[PluginManifest, ...]:
-        return tuple(self.manifest(plugin_id) for plugin_id in sorted(self._manifests))
+        with self._lock:
+            return tuple(self.manifest(plugin_id) for plugin_id in sorted(self._manifests))
 
     def load(
         self,
@@ -54,15 +59,32 @@ class PluginRegistry:
 
         manifest = self.manifest(plugin_id)
         self._policy.admit(manifest)
-        target = (resolver or _resolve_entry_point)(manifest.entry_point)
+        try:
+            target = (resolver or _resolve_entry_point)(manifest.entry_point)
+        except DNCError:
+            raise
+        except Exception as error:
+            raise DNCCapabilityError("plugin entry point resolution failed") from error
         if not callable(target):
             raise DNCValidationError("plugin entry point MUST resolve to a factory")
-        plugin = target()
-        if not isinstance(plugin, DNCPlugin):
+        try:
+            plugin = target()
+        except DNCError:
+            raise
+        except Exception as error:
+            raise DNCCapabilityError("plugin factory failed") from error
+        try:
+            implements_contract = isinstance(plugin, DNCPlugin)
+            loaded_fingerprint = plugin.manifest.fingerprint if implements_contract else None
+        except DNCError:
+            raise
+        except Exception as error:
+            raise DNCCapabilityError("plugin contract inspection failed") from error
+        if not implements_contract:
             raise DNCValidationError(
                 "plugin factory MUST return an object with manifest and activate"
             )
-        if plugin.manifest.fingerprint != manifest.fingerprint:
+        if loaded_fingerprint != manifest.fingerprint:
             raise DNCValidationError("loaded plugin manifest does not match admitted manifest")
         return plugin
 

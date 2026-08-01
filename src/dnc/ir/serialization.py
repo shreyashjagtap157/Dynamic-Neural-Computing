@@ -7,6 +7,7 @@ import json
 from copy import deepcopy
 from dataclasses import asdict
 from typing import Dict, Any
+from dnc.kernel.errors import DNCValidationError
 from dnc.kernel.versioning import schema_header
 from dnc.kernel.contracts import EffectType, IsolationGrade, SideEffectClass
 from dnc.ir.schema import validate_ir_document
@@ -165,6 +166,15 @@ class DNWIRSerializer:
         # Version metadata was added after the original freeze. Older vectors
         # without schema headers remain valid inputs for compatibility.
         validate_ir_document(data)
+        try:
+            return DNWIRSerializer._from_validated_dict(data)
+        except DNCValidationError:
+            raise
+        except (AttributeError, IndexError, KeyError, TypeError, ValueError) as error:
+            raise DNCValidationError("invalid DNC-IR document semantics") from error
+
+    @staticmethod
+    def _from_validated_dict(data: Dict[str, Any]) -> StructuralGraph:
         g_id = GraphID(data["graph_id"])
         v_data = data.get("version", {})
         version = GraphVersion(
@@ -308,5 +318,8 @@ class DNWIRSerializer:
 
     @staticmethod
     def from_json(json_str: str) -> StructuralGraph:
-        d = json.loads(json_str)
+        try:
+            d = json.loads(json_str)
+        except (TypeError, json.JSONDecodeError) as error:
+            raise DNCValidationError("DNC-IR payload MUST be valid JSON") from error
         return DNWIRSerializer.from_dict(d)

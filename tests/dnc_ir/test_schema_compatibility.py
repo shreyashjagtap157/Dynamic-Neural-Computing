@@ -158,3 +158,11 @@ def test_current_document_rejects_malformed_governance_envelope() -> None:
 
     with pytest.raises(DNCValidationError, match="payload_hash_required MUST be a boolean"):
         DNWIRSerializer.from_dict(data)
+
+
+def test_current_document_rejects_malformed_nested_unit_identity() -> None:
+    data = _document()
+    data["units"]["source"]["sub_units"] = [None]
+
+    with pytest.raises(DNCValidationError, match="invalid DNC-IR document semantics"):
+        DNWIRSerializer.from_dict(data)

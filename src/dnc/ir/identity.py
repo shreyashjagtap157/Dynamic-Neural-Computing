@@ -7,26 +7,44 @@ from dataclasses import dataclass, field
 import uuid
 from typing import Set
 
+
+def _validate_identity(value: object, name: str) -> None:
+    if not isinstance(value, str) or not value or value.strip() != value:
+        raise ValueError(f"{name} MUST be a normalized non-empty string")
+
+
 @dataclass(frozen=True)
 class UnitID:
     value: str = field(default_factory=lambda: f"unit_{uuid.uuid4().hex[:12]}")
+
+    def __post_init__(self) -> None:
+        _validate_identity(self.value, "UnitID")
     
     def __str__(self) -> str:
         return self.value
+
 
 @dataclass(frozen=True)
 class InstanceID:
     value: str = field(default_factory=lambda: f"inst_{uuid.uuid4().hex[:12]}")
+
+    def __post_init__(self) -> None:
+        _validate_identity(self.value, "InstanceID")
     
     def __str__(self) -> str:
         return self.value
 
+
 @dataclass(frozen=True)
 class GraphID:
     value: str = field(default_factory=lambda: f"graph_{uuid.uuid4().hex[:12]}")
+
+    def __post_init__(self) -> None:
+        _validate_identity(self.value, "GraphID")
     
     def __str__(self) -> str:
         return self.value
+
 
 @dataclass(frozen=True)
 class GraphVersion:
@@ -34,6 +52,12 @@ class GraphVersion:
     minor: int = 0
     patch: int = 0
     sequence: int = 0
+
+    def __post_init__(self) -> None:
+        for name in ("major", "minor", "patch", "sequence"):
+            value = getattr(self, name)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                raise ValueError(f"GraphVersion {name} MUST be a non-negative integer")
 
     def __str__(self) -> str:
         return f"v{self.major}.{self.minor}.{self.patch}-{self.sequence}"
@@ -46,19 +70,28 @@ class GraphVersion:
             sequence=self.sequence + 1
         )
 
+
 @dataclass(frozen=True)
 class MutationID:
     value: str = field(default_factory=lambda: f"mut_{uuid.uuid4().hex[:12]}")
+
+    def __post_init__(self) -> None:
+        _validate_identity(self.value, "MutationID")
     
     def __str__(self) -> str:
         return self.value
 
+
 @dataclass(frozen=True)
 class TransactionID:
     value: str = field(default_factory=lambda: f"tx_{uuid.uuid4().hex[:12]}")
+
+    def __post_init__(self) -> None:
+        _validate_identity(self.value, "TransactionID")
     
     def __str__(self) -> str:
         return self.value
+
 
 class IdentityRegistry:
     """

@@ -6,6 +6,7 @@ import json
 import re
 from copy import deepcopy
 from dataclasses import dataclass, field
+from threading import RLock
 from typing import Any
 
 from dnc.ir.contracts import ExecutionContext
@@ -67,6 +68,7 @@ class ArtifactRegistry:
     def __init__(self, object_store: ContentAddressedObjectStore | None = None) -> None:
         self.object_store = object_store or ContentAddressedObjectStore()
         self._records: dict[tuple[str, str], ArtifactRecord] = {}
+        self._lock = RLock()
 
     def register(
         self,
@@ -82,30 +84,32 @@ class ArtifactRegistry:
         if not isinstance(media_type, str) or not media_type or media_type.strip() != media_type:
             raise DNCValidationError("artifact media_type MUST be normalized and non-empty")
         descriptor_metadata = _validate_metadata(metadata or {})
-        digest = self.object_store.put(data, tenant_id=tenant)
-        content_ref = f"sha256:{digest}"
-        record = ArtifactRecord(
-            content_ref=content_ref,
-            tenant_id=tenant,
-            media_type=media_type,
-            size_bytes=len(data),
-            metadata=descriptor_metadata,
-        )
-        key = (tenant, content_ref)
-        previous = self._records.get(key)
-        if previous is not None and previous != record:
-            raise DNCValidationError(
-                "artifact content is already registered with a conflicting descriptor"
+        with self._lock:
+            digest = self.object_store.put(data, tenant_id=tenant)
+            content_ref = _validate_content_ref(f"sha256:{digest}")
+            record = ArtifactRecord(
+                content_ref=content_ref,
+                tenant_id=tenant,
+                media_type=media_type,
+                size_bytes=len(data),
+                metadata=descriptor_metadata,
             )
-        self._records[key] = deepcopy(record)
-        return deepcopy(record)
+            key = (tenant, content_ref)
+            previous = self._records.get(key)
+            if previous is not None and previous != record:
+                raise DNCValidationError(
+                    "artifact content is already registered with a conflicting descriptor"
+                )
+            self._records[key] = deepcopy(record)
+            return deepcopy(record)
 
     def record(self, content_ref: str, *, tenant_id: str) -> ArtifactRecord:
         key = (_validate_tenant(tenant_id), _validate_content_ref(content_ref))
-        try:
-            return deepcopy(self._records[key])
-        except KeyError as error:
-            raise KeyError("unknown tenant-scoped artifact") from error
+        with self._lock:
+            try:
+                return deepcopy(self._records[key])
+            except KeyError as error:
+                raise KeyError("unknown tenant-scoped artifact") from error
 
     def get(self, content_ref: str, *, tenant_id: str) -> bytes:
         record = self.record(content_ref, tenant_id=tenant_id)
@@ -117,11 +121,12 @@ class ArtifactRegistry:
 
     def all(self, *, tenant_id: str) -> tuple[ArtifactRecord, ...]:
         tenant = _validate_tenant(tenant_id)
-        return tuple(
-            deepcopy(self._records[key])
-            for key in sorted(self._records)
-            if key[0] == tenant
-        )
+        with self._lock:
+            return tuple(
+                deepcopy(self._records[key])
+                for key in sorted(self._records)
+                if key[0] == tenant
+            )
 
 
 class GraphRegistry:
@@ -135,6 +140,7 @@ class GraphRegistry:
         self.object_store = object_store or ContentAddressedObjectStore()
         self.validator = validator or DNCIRValidator()
         self._records: dict[tuple[str, str], GraphRecord] = {}
+        self._lock = RLock()
 
     def register(
         self,
@@ -144,45 +150,47 @@ class GraphRegistry:
         context: ExecutionContext | None = None,
     ) -> GraphRecord:
         tenant = _validate_tenant_context(tenant_id, context)
-        _admit_graph(graph, self.validator, context)
-        document = DNWIRSerializer.to_dict(graph)
-        try:
-            payload = json.dumps(
-                document,
-                sort_keys=True,
-                separators=(",", ":"),
-                allow_nan=False,
-            ).encode("utf-8")
-        except (TypeError, ValueError) as error:
-            raise DNCValidationError("graph document MUST contain finite JSON data") from error
-        # Round-trip through the public interchange boundary before persistence.
-        canonical_graph = DNWIRSerializer.from_json(payload.decode("utf-8"))
-        _admit_graph(canonical_graph, self.validator, context)
-        digest = self.object_store.put(payload, tenant_id=tenant)
-        content_ref = f"sha256:{digest}"
-        record = GraphRecord(
-            content_ref=content_ref,
-            tenant_id=tenant,
-            graph_id=canonical_graph.graph_id.value,
-            graph_version=str(canonical_graph.version),
-            schema_id=DNC_IR_SCHEMA_ID,
-            schema_version=DNC_IR_SCHEMA_VERSION,
-            unit_count=len(canonical_graph.units),
-            edge_count=len(canonical_graph.edges),
-        )
-        key = (tenant, content_ref)
-        previous = self._records.get(key)
-        if previous is not None and previous != record:
-            raise DNCValidationError("graph content conflicts with its registered descriptor")
-        self._records[key] = record
-        return record
+        with self._lock:
+            _admit_graph(graph, self.validator, context)
+            document = DNWIRSerializer.to_dict(graph)
+            try:
+                payload = json.dumps(
+                    document,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ).encode("utf-8")
+            except (TypeError, ValueError) as error:
+                raise DNCValidationError("graph document MUST contain finite JSON data") from error
+            # Round-trip through the public interchange boundary before persistence.
+            canonical_graph = DNWIRSerializer.from_json(payload.decode("utf-8"))
+            _admit_graph(canonical_graph, self.validator, context)
+            digest = self.object_store.put(payload, tenant_id=tenant)
+            content_ref = _validate_content_ref(f"sha256:{digest}")
+            record = GraphRecord(
+                content_ref=content_ref,
+                tenant_id=tenant,
+                graph_id=canonical_graph.graph_id.value,
+                graph_version=str(canonical_graph.version),
+                schema_id=DNC_IR_SCHEMA_ID,
+                schema_version=DNC_IR_SCHEMA_VERSION,
+                unit_count=len(canonical_graph.units),
+                edge_count=len(canonical_graph.edges),
+            )
+            key = (tenant, content_ref)
+            previous = self._records.get(key)
+            if previous is not None and previous != record:
+                raise DNCValidationError("graph content conflicts with its registered descriptor")
+            self._records[key] = record
+            return record
 
     def record(self, content_ref: str, *, tenant_id: str) -> GraphRecord:
         key = (_validate_tenant(tenant_id), _validate_content_ref(content_ref))
-        try:
-            return self._records[key]
-        except KeyError as error:
-            raise KeyError("unknown tenant-scoped graph") from error
+        with self._lock:
+            try:
+                return self._records[key]
+            except KeyError as error:
+                raise KeyError("unknown tenant-scoped graph") from error
 
     def load(
         self,
@@ -192,34 +200,40 @@ class GraphRegistry:
         context: ExecutionContext | None = None,
     ) -> StructuralGraph:
         tenant = _validate_tenant_context(tenant_id, context)
-        record = self.record(content_ref, tenant_id=tenant)
-        payload = self.object_store.get(_digest(record.content_ref), tenant_id=tenant)
-        try:
-            graph = DNWIRSerializer.from_json(payload.decode("utf-8"))
-        except UnicodeDecodeError as error:
-            raise DNCValidationError("registered graph MUST be UTF-8 JSON") from error
-        _admit_graph(graph, self.validator, context)
-        actual = GraphRecord(
-            content_ref=record.content_ref,
-            tenant_id=tenant,
-            graph_id=graph.graph_id.value,
-            graph_version=str(graph.version),
-            schema_id=DNC_IR_SCHEMA_ID,
-            schema_version=DNC_IR_SCHEMA_VERSION,
-            unit_count=len(graph.units),
-            edge_count=len(graph.edges),
-        )
-        if actual != record:
-            raise DNCValidationError("registered graph descriptor does not match stored content")
-        return graph
+        with self._lock:
+            record = self.record(content_ref, tenant_id=tenant)
+            payload = self.object_store.get(_digest(record.content_ref), tenant_id=tenant)
+            try:
+                graph = DNWIRSerializer.from_json(payload.decode("utf-8"))
+            except UnicodeDecodeError as error:
+                raise DNCValidationError("registered graph MUST be UTF-8 JSON") from error
+            except DNCValidationError as error:
+                raise DNCValidationError("registered graph MUST be valid DNC-IR JSON") from error
+            except (json.JSONDecodeError, TypeError, ValueError) as error:
+                raise DNCValidationError("registered graph MUST be valid DNC-IR JSON") from error
+            _admit_graph(graph, self.validator, context)
+            actual = GraphRecord(
+                content_ref=record.content_ref,
+                tenant_id=tenant,
+                graph_id=graph.graph_id.value,
+                graph_version=str(graph.version),
+                schema_id=DNC_IR_SCHEMA_ID,
+                schema_version=DNC_IR_SCHEMA_VERSION,
+                unit_count=len(graph.units),
+                edge_count=len(graph.edges),
+            )
+            if actual != record:
+                raise DNCValidationError("registered graph descriptor does not match stored content")
+            return graph
 
     def all(self, *, tenant_id: str) -> tuple[GraphRecord, ...]:
         tenant = _validate_tenant(tenant_id)
-        return tuple(
-            self._records[key]
-            for key in sorted(self._records)
-            if key[0] == tenant
-        )
+        with self._lock:
+            return tuple(
+                self._records[key]
+                for key in sorted(self._records)
+                if key[0] == tenant
+            )
 
 
 def _admit_graph(

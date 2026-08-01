@@ -6,8 +6,8 @@
 
 **Starting commit:** `2b5fb84`
 
-**Current state:** M1 in progress; `M1-IR-001` through `M1-IR-003`, `M1-RT-001`, and
-`M1-SDK-001` complete
+**Current state:** M1 complete; `M1-IR-001` through `M1-IR-003`, `M1-RT-001`, `M1-SDK-001`,
+and `M1-QA-001` complete
 
 ## Completed work package
 
@@ -102,9 +102,30 @@ The completion commit is the commit titled `Add governed SDK plugin and registry
 resolve its exact ID with
 `git log --oneline --grep='Add governed SDK plugin and registry foundations' -1`.
 
+### M1-QA-001 — Property, fuzz, concurrency, failure, and compatibility gate
+
+- Adds a development-only modern property-testing profile with deterministic, bounded generation,
+  shrinking, recursive malformed JSON, graph/order properties, and caller-payload/rollback properties.
+- Serializes shared-graph transactions across manager instances while retaining explicit-version OCC;
+  one base version admits exactly one concurrent writer.
+- Makes the content store, artifact/graph registries, and plugin manifest registry thread-safe for
+  their process-local contracts.
+- Injects storage put/read/digest/restore, plugin resolve/factory/inspection, malformed-operation, and
+  staging-rollback failures and verifies atomic state plus stable error taxonomy.
+- Exercises headerless, 1.1.0, 1.2.0, and 1.3.0 DNC-IR normalization, snapshot 0.1/0.2 replay
+  admission, plugin/SDK version compatibility, and future-version rejection.
+- Fixes a shrunk malformed-identity counterexample and enforces normalized IDs plus non-negative graph
+  versions at construction.
+
+The full methodology, coverage matrix, discovered defect, and residual limits are recorded in
+[the M1 robustness report](M1-ROBUSTNESS-REPORT.md).
+
+The completion commit is the commit titled `Complete the M1 runtime robustness gate`; resolve its
+exact ID with `git log --oneline --grep='Complete the M1 runtime robustness gate' -1`.
+
 ## Verification evidence
 
-- `python -W error -m pytest -q`: 464 passed, 2 intentional environment-dependent skips.
+- `python -W error -m pytest -q`: 515 passed, 2 intentional environment-dependent skips.
 - `python -m compileall -q src`: passed.
 - `python -m ruff check src tests tools/generate_conformance_report.py`: passed.
 - `PYTHONPATH=src python scripts/audits/phase12_system_audit.py`: 8/8 passed.
@@ -112,13 +133,16 @@ resolve its exact ID with
 - Architecture conformance: 30/30 invariants covered, 35/35 tests passed, 4/4 ACDs resolved.
 - A locally built wheel contains all supported 1.1.0, 1.2.0, and 1.3.0 structural-graph schemas plus
   plugin-manifest 1.0.0; an isolated installation exposes the `dnc` console command and SDK facade.
+- Two independent release builds produced byte-identical wheel and source archives; the wheel passed a
+  no-dependency minimal-environment SDK/schema import and console-command launch.
 
 ## Claims and residual risks
 
 This work supports a versioned and packaged Generic DNC-IR envelope plus typed port/edge validation.
-It does not yet provide a general schema migration framework beyond the explicit 1.1.0/1.2.0 readers,
-nor does it complete M1's property, fuzz, concurrency, or broader failure-testing commitments. The
-headerless legacy path is intentionally less strict and should be migrated before any future removal.
+It does not yet provide a general schema migration framework beyond the explicit 1.1.0/1.2.0 readers.
+The headerless legacy path is intentionally less strict and should be migrated before any future
+removal. M1's bounded, deterministic thread/property/fuzz gate does not establish distributed-store,
+unbounded security-fuzz, load, soak, chaos, or penetration qualification.
 M1 registries remain process-local references, and plugin admission does not make imported Python code
 safe; untrusted plugins require stronger isolation.
 
@@ -137,10 +161,12 @@ Rollback of `M1-SDK-001` removes SDK/CLI entry points, registry descriptors, and
 Content bytes remain addressable only through the underlying object-store API; callers must retain
 their tenant and digest mapping before rollback, and must not auto-import previously admitted plugins.
 
+Rollback of `M1-QA-001` removes shared-graph and registry locking, stable injected-failure taxonomy,
+identity ingress hardening, and the compatibility/property gates. It must not be used for concurrent
+writers or presented as the validated M1 runtime baseline.
+
 ## Exact next point
 
-Implement `M1-QA-001`: exercise the complete M1 IR, transaction/replay, SDK, plugin, CLI, and registry
-surface with deterministic property generators, bounded malformed-input fuzzing, thread concurrency,
-injected storage/import/copy failures, and explicit 1.1.0/1.2.0/current compatibility matrices. Fix
-every reproducible defect, retain deterministic seeds/cases, and then run the complete phase release
-gate before integrating and pushing M1.
+Run the complete repository release gate, commit `M1-QA-001`, integrate the phase branch into `main`,
+and push the complete M1 phase. M2 work must begin on a new phase branch and must preserve the M1
+interchange, governance, replay, SDK, and compatibility boundaries.

@@ -1,14 +1,14 @@
 # Dependency Profiles and Lock Snapshot
 
-**Date:** 2026-07-31
-**Phase:** Phase 1
+**Date:** 2026-08-01
+**Phase:** Enterprise Roadmap M1
 
 ## Declared profiles
 
 | Profile | Source | Dependencies |
 |---|---|---|
 | Core/minimal | `project.dependencies` | none |
-| Dev | `project.optional-dependencies.dev` | `pytest>=8`, `pytest-cov>=5`, `ruff>=0.9` |
+| Dev | `project.optional-dependencies.dev` | `hypothesis>=6.136.9,<7`, `pytest>=8`, `pytest-cov>=5`, `ruff>=0.9` |
 | Torch | `project.optional-dependencies.torch` | `torch>=2.2` |
 
 ## Observed tool lock snapshot
@@ -27,10 +27,13 @@ resolved and qualified in each accelerator environment.
 | pytest | `9.1.1` |
 | pytest-cov | `7.1.0` |
 | coverage | `7.15.2` |
+| hypothesis | `6.164.0` |
 | iniconfig | `2.3.0` |
 | pluggy | `1.6.0` |
 | ruff | `0.16.1` |
+| sortedcontainers | `2.4.0` |
 | build | `1.5.0` |
+| colorama | `0.4.6` |
 | pyproject_hooks | `1.2.0` |
 
 ## Reproducibility notes
