@@ -8,6 +8,7 @@ from dnc.assurance.contracts import (
     VerificationStatus,
     Verifier,
     VerifierClaim,
+    VerifierDescriptor,
     VerifierResult,
 )
 from dnc.kernel.errors import DNCVerificationError
@@ -41,6 +42,15 @@ class VerifierRegistry:
             )
             if verifier.descriptor.verifier_id not in self._disabled
             and verifier.descriptor.supports(claim)
+        )
+
+    def active_descriptors(self) -> tuple[VerifierDescriptor, ...]:
+        """Return enabled verifier descriptors in deterministic order."""
+
+        return tuple(
+            self._verifiers[verifier_id].descriptor
+            for verifier_id in sorted(self._verifiers)
+            if verifier_id not in self._disabled
         )
 
     def _require(self, verifier_id: str) -> Verifier:
@@ -89,8 +99,21 @@ class VerifierCascade:
             if policy.maximum_cost is not None and total_cost + descriptor.cost > policy.maximum_cost:
                 continue
             result = verifier.verify(claim)
-            if result.scope != claim.scope or result.claim_id != claim.claim_id:
-                raise DNCVerificationError("verifier returned a result outside the requested scope")
+            if (
+                result.scope != claim.scope
+                or result.claim_id != claim.claim_id
+                or result.target_id != claim.target_id
+                or result.tenant_id != claim.tenant_id
+                or result.verifier_id != descriptor.verifier_id
+                or result.verifier_version != descriptor.version
+                or result.verifier_fingerprint != descriptor.fingerprint
+                or result.independence_group != descriptor.independence_group
+            ):
+                raise DNCVerificationError(
+                    "verifier returned a result outside its declared identity or claim scope"
+                )
+            if result.status is VerificationStatus.PASS and not result.checks:
+                raise DNCVerificationError("passing verifier result MUST declare performed checks")
             results.append(result)
             total_cost += descriptor.cost
             if result.status is VerificationStatus.FAIL and policy.stop_on_failure:

@@ -10,15 +10,16 @@ import copy
 from dataclasses import dataclass
 from typing import Optional, Protocol
 
-from dnc.assurance.calibration import AssuranceCalibrationRegistry
+from dnc.assurance.calibration import AssuranceCalibrationRegistry, CalibrationKey
 from dnc.assurance.contracts import VerifierClaim
-from dnc.assurance.outcomes import OutcomeLabelStore
-from dnc.assurance.policy import RiskPolicyRegistry
+from dnc.assurance.outcomes import OutcomeLabel, OutcomeLabelStore
+from dnc.assurance.policy import RiskPolicyRegistry, issue_confidence
 from dnc.assurance.registry import CascadePolicy, CascadeResult, VerifierCascade, VerifierRegistry
 from dnc.capabilities.broker import CapabilityBroker
 from dnc.capabilities.contracts import CapabilityRequirement, CapabilitySelection
 from dnc.capabilities.registry import CapabilityRegistry
 from dnc.cognition.migration import export_cognitive_state, import_cognitive_state
+from dnc.cognition.contracts import ConfidenceEstimate
 from dnc.cognition.state import CognitiveState
 from dnc.dcc.assessment_engine import Assessment, AssessmentEngine, ExecutionResult
 from dnc.dcc.computation_generator import (
@@ -38,6 +39,7 @@ from dnc.mutation.engine import MutationEngine
 from dnc.observability.provenance import ProvenanceLog
 from dnc.projection.projector import StructuralProjector
 from dnc.transaction.manager import TransactionManager
+from dnc.kernel.errors import DNCCalibrationError
 
 
 class ExecutionCore(Protocol):
@@ -237,6 +239,52 @@ class DNCSystem:
         """Run a scoped Phase 5 verifier cascade through the canonical system."""
 
         return VerifierCascade(self.verifier_registry).run(claim, policy)
+
+    def record_outcome_label(self, label: OutcomeLabel) -> None:
+        """Append immediate or delayed Phase 5 outcome evidence."""
+
+        self.outcome_labels.ingest(label)
+
+    def issue_calibrated_confidence(
+        self,
+        estimate_id: str,
+        target_id: str,
+        target_type: str,
+        probability: float,
+        key: CalibrationKey,
+        *,
+        semantic_cluster_count: int = 0,
+        correlation_groups: tuple[str, ...] = (),
+    ) -> ConfidenceEstimate:
+        """Issue confidence only through a matching promoted calibration artifact."""
+
+        capability_fingerprints = {
+            card.fingerprint for card in self.capability_registry.available() if card.fingerprint
+        }
+        if key.capability_fingerprint not in capability_fingerprints:
+            raise DNCCalibrationError(
+                "calibration capability fingerprint is not currently available"
+            )
+        active_verifier_fingerprints = {
+            descriptor.fingerprint
+            for descriptor in self.verifier_registry.active_descriptors()
+            if descriptor.fingerprint
+        }
+        missing_verifiers = set(key.verifier_fingerprints) - active_verifier_fingerprints
+        if missing_verifiers:
+            raise DNCCalibrationError(
+                f"calibration verifier fingerprints are unavailable: {sorted(missing_verifiers)}"
+            )
+        artifact = self.assurance_calibrations.require_applicable(key)
+        return issue_confidence(
+            estimate_id,
+            target_id,
+            target_type,
+            probability,
+            artifact,
+            semantic_cluster_count=semantic_cluster_count,
+            correlation_groups=correlation_groups,
+        )
 
     def restore_execution_snapshot(self, snapshot: Snapshot) -> None:
         """Atomically restore integrated process-local state from a snapshot."""

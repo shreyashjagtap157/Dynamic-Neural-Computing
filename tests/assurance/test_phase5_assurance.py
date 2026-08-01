@@ -1,5 +1,6 @@
 import json
 import math
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -39,8 +40,8 @@ from dnc.assurance import (
     subgroup_analysis,
 )
 from dnc.cognition import EpistemicItem, EpistemicRelation, EpistemicStatus, RelationType, RiskClass
-from dnc.capabilities import CapabilityCard, CapabilityRegistry
-from dnc.cognition import CognitiveActionType
+from dnc.capabilities import CapabilityCard, CapabilityRegistry, CapabilityRequirement
+from dnc.cognition import CognitiveActionType, CognitiveState, GoalInvariant, PolicyContext, TaskSpec
 from dnc.kernel.errors import DNCCalibrationError, DNCPolicyError, DNCVerificationError
 from dnc.system import DNCSystem
 
@@ -99,6 +100,21 @@ def test_callback_adapter_requires_external_model_or_human_kind() -> None:
     assert adapter.verify(_claim("answer")).status is VerificationStatus.PASS
     with pytest.raises(ValueError, match="external"):
         CallbackVerifierAdapter(_descriptor("deterministic"), format_check())
+
+
+def test_cascade_rejects_cross_tenant_or_forged_adapter_results() -> None:
+    legitimate = FunctionalVerifier(_descriptor("external", kind=VerifierKind.EXTERNAL), format_check())
+
+    class ForgedAdapter:
+        descriptor = legitimate.descriptor
+
+        def verify(self, claim: VerifierClaim):
+            return replace(legitimate.verify(claim), tenant_id="different-tenant")
+
+    registry = VerifierRegistry()
+    registry.register(ForgedAdapter())
+    with pytest.raises(DNCVerificationError, match="identity or claim scope"):
+        DNCSystem(verifier_registry=registry).verify_claim(_claim("answer"))
 
 
 def test_cascade_orders_by_cost_and_requires_independent_evidence() -> None:
@@ -162,7 +178,7 @@ def test_delayed_outcomes_are_append_only_idempotent_and_tenant_scoped() -> None
 def _artifact(status: CalibrationStatus = CalibrationStatus.CALIBRATED) -> CalibrationArtifact:
     metrics = evaluate_calibration([0.1, 0.2, 0.8, 0.9], [0, 0, 1, 1], bins=2)
     return CalibrationArtifact(
-        "artifact-1", "1", CalibrationKey("general", RiskClass.HIGH, "model-1", "prompt-1", "decode-1", ("verifier-1",), "tasks-v1"),
+        "artifact-1", "1", CalibrationKey("general", RiskClass.HIGH, "model-1", "prompt-1", "decode-1", ("verifier-1-fp",), "tasks-v1"),
         "logistic", (1.0, 0.0), "labels-v1", "held-out", metrics, status=status,
         assumptions=("held-out labels representative",),
     )
@@ -308,3 +324,80 @@ def test_frozen_held_out_fixture_meets_declared_reference_risk_coverage_targets(
     assert metrics.expected_calibration_error <= acceptance["maximum_ece"]
     half_coverage_risk = metrics.selective_risk[len(metrics.selective_risk) // 2 - 1][1]
     assert half_coverage_risk <= acceptance["maximum_risk_at_half_coverage"]
+
+
+def test_phases1_to5_operate_as_one_governed_system() -> None:
+    capabilities = CapabilityRegistry()
+    card = CapabilityCard(
+        "model", "Model", "provider", "1", "model-v1",
+        frozenset({CognitiveActionType.REASON}), RiskClass.HIGH,
+        fingerprint="model-1",
+    )
+    capabilities.register(card)
+    verifiers = VerifierRegistry()
+    verifiers.register(FunctionalVerifier(_descriptor("verifier-1"), format_check()))
+    calibrations = AssuranceCalibrationRegistry()
+    artifact = calibrations.register(_artifact())
+    cognitive_state = CognitiveState(
+        TaskSpec(
+            task_id="task",
+            tenant_id="tenant-a",
+            actor_id="actor",
+            session_id="session",
+            description="Produce a verified answer",
+            goal=GoalInvariant(
+                "Produce a verified answer", mandatory_verification=("verifier-1",)
+            ),
+            policy=PolicyContext(risk_class=RiskClass.HIGH),
+        )
+    )
+    system = DNCSystem(
+        execution_id="phase1-5-manual",
+        cognitive_state=cognitive_state,
+        capability_registry=capabilities,
+        verifier_registry=verifiers,
+        assurance_calibrations=calibrations,
+    )
+    graph_identity = system.graph.graph_id
+    snapshot = system.capture_execution_snapshot("phase1-5-snapshot")
+
+    selection = system.select_capability(
+        CapabilityRequirement(CognitiveActionType.REASON, RiskClass.HIGH)
+    )
+    assert selection.satisfied and selection.selected == card
+    verification = system.verify_claim(_claim("verified answer"))
+    assert verification.satisfied
+    system.record_outcome_label(
+        OutcomeLabel("immediate", "answer-1", True, 1, "format", tenant_id="tenant-a")
+    )
+    confidence = system.issue_calibrated_confidence(
+        "confidence", "answer-1", "answer", 0.9, artifact.key,
+        semantic_cluster_count=2, correlation_groups=("model", "exact-tool"),
+    )
+    assert confidence.applicability_status == "calibrated"
+
+    verifiers.disable("verifier-1")
+    with pytest.raises(DNCCalibrationError, match="verifier fingerprints"):
+        system.issue_calibrated_confidence(
+            "disabled-verifier", "answer-1", "answer", 0.9, artifact.key
+        )
+    verifiers.enable("verifier-1")
+
+    system.update_cognitive_state(cognitive_state.with_materialized_view("answer", ()))
+    capabilities.disable("model")
+    system.restore_execution_snapshot(snapshot)
+    assert system.graph.graph_id == graph_identity
+    assert system.cognitive_state == cognitive_state
+    assert not capabilities.is_disabled("model")
+    assert system.outcome_labels.current("answer-1", tenant_id="tenant-a") is not None
+
+    capabilities.register(
+        CapabilityCard(
+            "model", "Model", "provider", "2", "model-v2",
+            frozenset({CognitiveActionType.REASON}), RiskClass.HIGH,
+            fingerprint="model-2",
+        )
+    )
+    with pytest.raises(DNCCalibrationError, match="capability fingerprint"):
+        system.issue_calibrated_confidence("stale", "answer-1", "answer", 0.9, artifact.key)
+    assert system.assurance_calibrations.applicable(artifact.key) is None
