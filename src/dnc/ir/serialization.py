@@ -8,11 +8,24 @@ from copy import deepcopy
 from dataclasses import asdict
 from typing import Dict, Any
 from dnc.kernel.versioning import schema_header
+from dnc.kernel.contracts import EffectType, IsolationGrade, SideEffectClass
 from dnc.ir.schema import validate_ir_document
 from .graph import StructuralGraph, Edge, EdgeType
 from .identity import GraphID, GraphVersion, UnitID
 from .unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension, UnitContract, MutationContract, Constraint, EnforcementTier
-from .contracts import PortCardinality, PortContract, PortDirection, PortKind
+from .contracts import (
+    DataClassification,
+    IdempotencyContract,
+    IdempotencyMode,
+    IdempotencyScope,
+    PlacementContract,
+    PortCardinality,
+    PortContract,
+    PortDirection,
+    PortKind,
+    SecurityContract,
+    SideEffectContract,
+)
 
 class DNWIRSerializer:
     """
@@ -61,6 +74,54 @@ class DNWIRSerializer:
                         }
                         for port in u.contract.ports
                     ],
+                    "idempotency": {
+                        "mode": u.contract.idempotency.mode.value,
+                        "scope": u.contract.idempotency.scope.value,
+                        "key_field": u.contract.idempotency.key_field,
+                        "payload_hash_required": u.contract.idempotency.payload_hash_required,
+                    },
+                    "side_effects": {
+                        "classification": u.contract.side_effects.classification.value,
+                        "effect_types": sorted(
+                            item.value for item in u.contract.side_effects.effect_types
+                        ),
+                        "compensation_action": u.contract.side_effects.compensation_action,
+                        "minimum_isolation": u.contract.side_effects.minimum_isolation.value,
+                    },
+                    "placement": {
+                        "allowed_regions": sorted(u.contract.placement.allowed_regions),
+                        "allowed_devices": sorted(u.contract.placement.allowed_devices),
+                        "allowed_runtimes": sorted(u.contract.placement.allowed_runtimes),
+                        "required_capabilities": sorted(
+                            u.contract.placement.required_capabilities
+                        ),
+                        "preferred_regions": list(u.contract.placement.preferred_regions),
+                        "preferred_devices": list(u.contract.placement.preferred_devices),
+                        "requires_local_inputs": u.contract.placement.requires_local_inputs,
+                    },
+                    "security": {
+                        "tenant_id": u.contract.security.tenant_id,
+                        "required_permissions": sorted(
+                            u.contract.security.required_permissions
+                        ),
+                        "security_labels": sorted(u.contract.security.security_labels),
+                        "output_classification": (
+                            u.contract.security.output_classification.value
+                        ),
+                        "maximum_input_classification": (
+                            u.contract.security.maximum_input_classification.value
+                        ),
+                        "allowed_residencies": sorted(
+                            u.contract.security.allowed_residencies
+                        ),
+                        "trust_zone": u.contract.security.trust_zone,
+                        "accepted_trust_zones": sorted(
+                            u.contract.security.accepted_trust_zones
+                        ),
+                        "confidential_compute_required": (
+                            u.contract.security.confidential_compute_required
+                        ),
+                    },
                 },
                 "mutation_contract": {
                     **asdict(u.mutation_contract),
@@ -118,6 +179,10 @@ class DNWIRSerializer:
             )
             c_data = dict(u_data.get("contract", {}))
             port_data = c_data.pop("ports", [])
+            idempotency_data = c_data.pop("idempotency", {})
+            side_effect_data = c_data.pop("side_effects", {})
+            placement_data = c_data.pop("placement", {})
+            security_data = c_data.pop("security", {})
             u.contract = UnitContract(
                 **c_data,
                 ports=[
@@ -133,6 +198,74 @@ class DNWIRSerializer:
                     )
                     for port in port_data
                 ],
+                idempotency=IdempotencyContract(
+                    mode=IdempotencyMode(
+                        idempotency_data.get("mode", IdempotencyMode.NONE.value)
+                    ),
+                    scope=IdempotencyScope(
+                        idempotency_data.get("scope", IdempotencyScope.TASK.value)
+                    ),
+                    key_field=idempotency_data.get("key_field"),
+                    payload_hash_required=idempotency_data.get(
+                        "payload_hash_required", True
+                    ),
+                ),
+                side_effects=SideEffectContract(
+                    classification=SideEffectClass(
+                        side_effect_data.get(
+                            "classification", SideEffectClass.NONE.value
+                        )
+                    ),
+                    effect_types=frozenset(
+                        EffectType(value)
+                        for value in side_effect_data.get("effect_types", [])
+                    ),
+                    compensation_action=side_effect_data.get("compensation_action"),
+                    minimum_isolation=IsolationGrade(
+                        side_effect_data.get(
+                            "minimum_isolation", IsolationGrade.I0_NONE.value
+                        )
+                    ),
+                ),
+                placement=PlacementContract(
+                    allowed_regions=frozenset(placement_data.get("allowed_regions", [])),
+                    allowed_devices=frozenset(placement_data.get("allowed_devices", [])),
+                    allowed_runtimes=frozenset(placement_data.get("allowed_runtimes", [])),
+                    required_capabilities=frozenset(
+                        placement_data.get("required_capabilities", [])
+                    ),
+                    preferred_regions=tuple(placement_data.get("preferred_regions", [])),
+                    preferred_devices=tuple(placement_data.get("preferred_devices", [])),
+                    requires_local_inputs=placement_data.get("requires_local_inputs", False),
+                ),
+                security=SecurityContract(
+                    tenant_id=security_data.get("tenant_id"),
+                    required_permissions=frozenset(
+                        security_data.get("required_permissions", [])
+                    ),
+                    security_labels=frozenset(security_data.get("security_labels", [])),
+                    output_classification=DataClassification(
+                        security_data.get(
+                            "output_classification", DataClassification.INTERNAL.value
+                        )
+                    ),
+                    maximum_input_classification=DataClassification(
+                        security_data.get(
+                            "maximum_input_classification",
+                            DataClassification.RESTRICTED.value,
+                        )
+                    ),
+                    allowed_residencies=frozenset(
+                        security_data.get("allowed_residencies", [])
+                    ),
+                    trust_zone=security_data.get("trust_zone", ""),
+                    accepted_trust_zones=frozenset(
+                        security_data.get("accepted_trust_zones", [])
+                    ),
+                    confidential_compute_required=security_data.get(
+                        "confidential_compute_required", False
+                    ),
+                ),
             )
             
             mc_data = u_data.get("mutation_contract", {})

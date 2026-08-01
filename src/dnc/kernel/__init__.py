@@ -13,6 +13,7 @@ from dnc.kernel.errors import (
     DNCValidationError,
     DNCVerificationError,
 )
+from dnc.kernel.contracts import EffectType, IsolationGrade, SideEffectClass
 from dnc.kernel.interfaces import (
     ArtifactStore,
     CancellationToken,
@@ -50,12 +51,15 @@ __all__ = [
     "DNCVerificationError",
     "DNC_IR_SCHEMA_ID",
     "DNC_IR_SCHEMA_VERSION",
+    "EffectType",
     "Deadline",
     "HashProvider",
     "IDProvider",
     "KERNEL_COMPATIBILITY_VERSION",
+    "IsolationGrade",
     "RandomnessProvider",
     "SchemaVersion",
+    "SideEffectClass",
     "SUPPORTED_DNC_IR_SCHEMA_VERSIONS",
     "validate_schema_header",
 ]

@@ -5,6 +5,7 @@ Implements deterministic lowering of a valid DNC-IR Structural Graph into an Exe
 
 from typing import Tuple, List, Dict
 from dnc.ir.graph import StructuralGraph, EdgeType
+from dnc.ir.contracts import ExecutionContext
 from dnc.ir.validator import DNCIRValidator
 from .executable_graph import ExecutableDAG, ExecutableNode, ExecutableEdge
 
@@ -16,11 +17,26 @@ class StructuralProjector:
     def __init__(self, validator: DNCIRValidator = None):
         self.validator = validator or DNCIRValidator()
 
-    def project(self, graph: StructuralGraph) -> Tuple[ExecutableDAG, List[str]]:
+    def project(
+        self,
+        graph: StructuralGraph,
+        context: ExecutionContext | None = None,
+    ) -> Tuple[ExecutableDAG, List[str]]:
         # 1. Validate structural graph prior to projection
         val_res = self.validator.validate_graph(graph)
         if not val_res.is_valid:
             raise ValueError(f"Cannot project invalid Structural Graph: {val_res.errors}")
+        requires_context = any(
+            unit.contract.requires_execution_context() for unit in graph.units.values()
+        )
+        if requires_context and context is None:
+            raise ValueError("Cannot project governed graph without an ExecutionContext")
+        if context is not None:
+            context_result = self.validator.validate_execution_context(graph, context)
+            if not context_result.is_valid:
+                raise ValueError(
+                    f"ExecutionContext does not satisfy Structural Graph: {context_result.errors}"
+                )
 
         warnings: List[str] = []
 
@@ -69,7 +85,11 @@ class StructuralProjector:
             exec_dag.nodes[uid] = ExecutableNode(
                 unit_id=unit.unit_id,
                 name=unit.name,
-                metadata=dict(unit.metadata)
+                metadata=dict(unit.metadata),
+                idempotency=unit.contract.idempotency,
+                side_effects=unit.contract.side_effects,
+                placement=unit.contract.placement,
+                security=unit.contract.security,
             )
 
         sorted_edges = sorted(graph.edges, key=lambda e: (e.source.value, e.target.value, e.edge_type.value))

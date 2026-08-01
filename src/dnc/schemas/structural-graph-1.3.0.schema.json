@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dnc:schema:dnc.ir.structural_graph:1.3.0",
+  "title": "DNC Generic Structural Graph with Execution Governance",
+  "type": "object",
+  "required": ["schema_id", "schema_version", "compatibility_version", "graph_id", "version", "units", "edges", "metadata"],
+  "properties": {
+    "schema_id": {"const": "dnc.ir.structural_graph"},
+    "schema_version": {"const": "1.3.0"},
+    "compatibility_version": {"const": "2026.07.phase1"},
+    "graph_id": {"type": "string", "minLength": 1},
+    "version": {
+      "type": "object",
+      "required": ["major", "minor", "patch", "sequence"],
+      "properties": {
+        "major": {"type": "integer", "minimum": 0},
+        "minor": {"type": "integer", "minimum": 0},
+        "patch": {"type": "integer", "minimum": 0},
+        "sequence": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "units": {"type": "object", "additionalProperties": {"$ref": "#/$defs/unit"}},
+    "edges": {"type": "array", "items": {"$ref": "#/$defs/edge"}},
+    "metadata": {"type": "object"}
+  },
+  "$defs": {
+    "stringSet": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "port": {
+      "type": "object",
+      "required": ["port_id", "direction", "kind", "schema", "cardinality", "description"],
+      "properties": {
+        "port_id": {"type": "string", "minLength": 1},
+        "direction": {"enum": ["INPUT", "OUTPUT"]},
+        "kind": {"enum": ["DATA", "CONTROL", "STATE", "RESOURCE"]},
+        "schema": {"type": "object"},
+        "cardinality": {"enum": ["EXACTLY_ONE", "ZERO_OR_ONE", "ONE_OR_MORE", "ZERO_OR_MORE"]},
+        "description": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "idempotency": {
+      "type": "object",
+      "required": ["mode", "scope", "key_field", "payload_hash_required"],
+      "properties": {
+        "mode": {"enum": ["NONE", "IDEMPOTENT", "KEY_REQUIRED", "AT_MOST_ONCE"]},
+        "scope": {"enum": ["REQUEST", "TASK", "TENANT"]},
+        "key_field": {"type": ["string", "null"]},
+        "payload_hash_required": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "sideEffects": {
+      "type": "object",
+      "required": ["classification", "effect_types", "compensation_action", "minimum_isolation"],
+      "properties": {
+        "classification": {"enum": ["NONE", "REVERSIBLE", "COMPENSATABLE", "IRREVERSIBLE"]},
+        "effect_types": {
+          "type": "array",
+          "items": {"enum": ["PROVIDER_CALL", "FILE_WRITE", "DATABASE_WRITE", "NETWORK_CALL", "CACHE_WRITE", "PROCESS_SPAWN", "CLEANUP"]},
+          "uniqueItems": true
+        },
+        "compensation_action": {"type": ["string", "null"]},
+        "minimum_isolation": {"enum": ["I0_NONE", "I1_GRAPH_ONLY", "I2_PROCESS_LOCAL", "I3_RECORDED_EXTERNALS", "I4_SANDBOXED_ENVIRONMENT"]}
+      },
+      "additionalProperties": false
+    },
+    "placement": {
+      "type": "object",
+      "required": ["allowed_regions", "allowed_devices", "allowed_runtimes", "required_capabilities", "preferred_regions", "preferred_devices", "requires_local_inputs"],
+      "properties": {
+        "allowed_regions": {"$ref": "#/$defs/stringSet"},
+        "allowed_devices": {"$ref": "#/$defs/stringSet"},
+        "allowed_runtimes": {"$ref": "#/$defs/stringSet"},
+        "required_capabilities": {"$ref": "#/$defs/stringSet"},
+        "preferred_regions": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "preferred_devices": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "requires_local_inputs": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "security": {
+      "type": "object",
+      "required": ["tenant_id", "required_permissions", "security_labels", "output_classification", "maximum_input_classification", "allowed_residencies", "trust_zone", "accepted_trust_zones", "confidential_compute_required"],
+      "properties": {
+        "tenant_id": {"type": ["string", "null"]},
+        "required_permissions": {"$ref": "#/$defs/stringSet"},
+        "security_labels": {"$ref": "#/$defs/stringSet"},
+        "output_classification": {"enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]},
+        "maximum_input_classification": {"enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]},
+        "allowed_residencies": {"$ref": "#/$defs/stringSet"},
+        "trust_zone": {"type": "string"},
+        "accepted_trust_zones": {"$ref": "#/$defs/stringSet"},
+        "confidential_compute_required": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "contract": {
+      "type": "object",
+      "required": ["input_schema", "output_schema", "preconditions", "postconditions", "resource_limits", "ports", "idempotency", "side_effects", "placement", "security"],
+      "properties": {
+        "input_schema": {"type": "object"},
+        "output_schema": {"type": "object"},
+        "preconditions": {"type": "array", "items": {"type": "string"}},
+        "postconditions": {"type": "array", "items": {"type": "string"}},
+        "resource_limits": {"type": "object"},
+        "ports": {"type": "array", "items": {"$ref": "#/$defs/port"}},
+        "idempotency": {"$ref": "#/$defs/idempotency"},
+        "side_effects": {"$ref": "#/$defs/sideEffects"},
+        "placement": {"$ref": "#/$defs/placement"},
+        "security": {"$ref": "#/$defs/security"}
+      },
+      "additionalProperties": false
+    },
+    "unit": {
+      "type": "object",
+      "required": ["unit_id", "name", "structure", "visibility", "lifecycle", "contract", "mutation_contract", "constraints", "metadata", "sub_units"],
+      "properties": {
+        "unit_id": {"type": "string", "minLength": 1},
+        "name": {"type": "string"},
+        "structure": {"enum": ["PRIMITIVE", "COMPOSITE"]},
+        "visibility": {"enum": ["OPAQUE", "INSPECTABLE"]},
+        "lifecycle": {"enum": ["BASE", "SPECIALIZED"]},
+        "contract": {"$ref": "#/$defs/contract"},
+        "mutation_contract": {"type": "object"},
+        "constraints": {"type": "array"},
+        "metadata": {"type": "object"},
+        "sub_units": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "edge": {
+      "type": "object",
+      "required": ["source", "target", "edge_type", "metadata", "source_port", "target_port"],
+      "properties": {
+        "source": {"type": "string", "minLength": 1},
+        "target": {"type": "string", "minLength": 1},
+        "edge_type": {"enum": ["DATA", "CONTROL", "STATE", "DEPENDENCY", "RESOURCE"]},
+        "metadata": {"type": "object"},
+        "source_port": {"type": ["string", "null"]},
+        "target_port": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

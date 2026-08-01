@@ -2,6 +2,7 @@ import copy
 
 import pytest
 
+from dnc.ir.contracts import IdempotencyContract, SideEffectContract
 from dnc.ir.schema import structural_graph_schema, validate_ir_document
 from dnc.ir.graph import Edge, EdgeType, StructuralGraph
 from dnc.ir.identity import GraphID, GraphVersion, UnitID
@@ -44,6 +45,7 @@ def test_packaged_schema_identifies_the_current_generic_ir_contract() -> None:
     assert schema["properties"]["schema_id"]["const"] == DNC_IR_SCHEMA_ID
     assert {"units", "edges", "version"}.issubset(schema["required"])
     assert structural_graph_schema("1.1.0")["$id"].endswith(":1.1.0")
+    assert structural_graph_schema("1.2.0")["$id"].endswith(":1.2.0")
 
 
 @pytest.mark.parametrize(
@@ -103,7 +105,10 @@ def test_versioned_1_1_document_migrates_with_empty_port_defaults() -> None:
     data = _document()
     data["schema_version"] = "1.1.0"
     for unit in data["units"].values():
-        unit["contract"].pop("ports")
+        for field_name in (
+            "ports", "idempotency", "side_effects", "placement", "security"
+        ):
+            unit["contract"].pop(field_name)
     for edge in data["edges"]:
         edge.pop("source_port")
         edge.pop("target_port")
@@ -114,7 +119,7 @@ def test_versioned_1_1_document_migrates_with_empty_port_defaults() -> None:
     assert restored.edges[0].source_port is None
 
 
-def test_versioned_1_2_document_rejects_malformed_port_contracts() -> None:
+def test_current_document_rejects_malformed_port_contracts() -> None:
     data = _document()
     data["units"]["source"]["contract"]["ports"] = [
         {
@@ -128,4 +133,28 @@ def test_versioned_1_2_document_rejects_malformed_port_contracts() -> None:
     ]
 
     with pytest.raises(DNCValidationError, match="direction is unsupported"):
+        DNWIRSerializer.from_dict(data)
+
+
+def test_versioned_1_2_document_migrates_with_governance_defaults() -> None:
+    data = _document()
+    data["schema_version"] = "1.2.0"
+    for unit in data["units"].values():
+        for field_name in ("idempotency", "side_effects", "placement", "security"):
+            unit["contract"].pop(field_name)
+
+    restored = DNWIRSerializer.from_dict(data)
+    contract = restored.units["source"].contract
+
+    assert contract.idempotency == IdempotencyContract()
+    assert contract.side_effects == SideEffectContract()
+
+
+def test_current_document_rejects_malformed_governance_envelope() -> None:
+    data = _document()
+    data["units"]["source"]["contract"]["idempotency"][
+        "payload_hash_required"
+    ] = "yes"
+
+    with pytest.raises(DNCValidationError, match="payload_hash_required MUST be a boolean"):
         DNWIRSerializer.from_dict(data)

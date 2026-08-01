@@ -8,12 +8,20 @@ from importlib.resources import files
 from typing import Any
 
 from dnc.kernel.errors import DNCValidationError
+from dnc.kernel.contracts import EffectType, IsolationGrade, SideEffectClass
 from dnc.kernel.versioning import (
     DNC_IR_SCHEMA_VERSION,
     SUPPORTED_DNC_IR_SCHEMA_VERSIONS,
     validate_schema_header,
 )
-from dnc.ir.contracts import PortCardinality, PortDirection, PortKind
+from dnc.ir.contracts import (
+    DataClassification,
+    IdempotencyMode,
+    IdempotencyScope,
+    PortCardinality,
+    PortDirection,
+    PortKind,
+)
 
 
 def structural_graph_schema(version: str = DNC_IR_SCHEMA_VERSION) -> dict[str, Any]:
@@ -70,7 +78,7 @@ def validate_ir_document(document: Mapping[str, Any]) -> None:
             )
         for field_name in ("name", "structure", "visibility", "lifecycle"):
             _require_type(unit, field_name, str, "string", prefix=f"units.{unit_key}")
-        if schema_version is not None and str(schema_version) == "1.2.0":
+        if schema_version is not None and str(schema_version) in {"1.2.0", "1.3.0"}:
             _require_type(unit, "contract", Mapping, "object", prefix=f"units.{unit_key}")
             contract = unit["contract"]
             _require_type(
@@ -89,13 +97,15 @@ def validate_ir_document(document: Mapping[str, Any]) -> None:
                     raise DNCValidationError(f"{prefix}.kind is unsupported")
                 if port["cardinality"] not in {item.value for item in PortCardinality}:
                     raise DNCValidationError(f"{prefix}.cardinality is unsupported")
+            if str(schema_version) == "1.3.0":
+                _validate_governance_contract(contract, f"units.{unit_key}.contract")
 
     for index, edge in enumerate(document.get("edges", [])):
         if not isinstance(edge, Mapping):
             raise DNCValidationError(f"edges.{index} MUST be an object")
         for field_name in ("source", "target", "edge_type"):
             _require_type(edge, field_name, str, "string", prefix=f"edges.{index}")
-        if schema_version is not None and str(schema_version) == "1.2.0":
+        if schema_version is not None and str(schema_version) in {"1.2.0", "1.3.0"}:
             for field_name in ("source_port", "target_port"):
                 if field_name not in edge:
                     raise DNCValidationError(f"edges.{index}.{field_name} is required")
@@ -103,6 +113,111 @@ def validate_ir_document(document: Mapping[str, Any]) -> None:
                     raise DNCValidationError(
                         f"edges.{index}.{field_name} MUST be a string or null"
                     )
+
+
+def _validate_governance_contract(contract: Mapping[str, Any], prefix: str) -> None:
+    for field_name in ("idempotency", "side_effects", "placement", "security"):
+        _require_type(contract, field_name, Mapping, "object", prefix=prefix)
+
+    idempotency = contract["idempotency"]
+    _require_enum(idempotency, "mode", IdempotencyMode, f"{prefix}.idempotency")
+    _require_enum(idempotency, "scope", IdempotencyScope, f"{prefix}.idempotency")
+    _require_nullable_string(idempotency, "key_field", f"{prefix}.idempotency")
+    _require_type(
+        idempotency,
+        "payload_hash_required",
+        bool,
+        "boolean",
+        prefix=f"{prefix}.idempotency",
+    )
+
+    effects = contract["side_effects"]
+    _require_enum(effects, "classification", SideEffectClass, f"{prefix}.side_effects")
+    _require_string_array(effects, "effect_types", f"{prefix}.side_effects")
+    if any(value not in {item.value for item in EffectType} for value in effects["effect_types"]):
+        raise DNCValidationError(f"{prefix}.side_effects.effect_types contains an unsupported value")
+    _require_nullable_string(effects, "compensation_action", f"{prefix}.side_effects")
+    _require_enum(
+        effects, "minimum_isolation", IsolationGrade, f"{prefix}.side_effects"
+    )
+
+    placement = contract["placement"]
+    for field_name in (
+        "allowed_regions",
+        "allowed_devices",
+        "allowed_runtimes",
+        "required_capabilities",
+        "preferred_regions",
+        "preferred_devices",
+    ):
+        _require_string_array(placement, field_name, f"{prefix}.placement")
+    _require_type(
+        placement,
+        "requires_local_inputs",
+        bool,
+        "boolean",
+        prefix=f"{prefix}.placement",
+    )
+
+    security = contract["security"]
+    _require_nullable_string(security, "tenant_id", f"{prefix}.security")
+    for field_name in (
+        "required_permissions",
+        "security_labels",
+        "allowed_residencies",
+        "accepted_trust_zones",
+    ):
+        _require_string_array(security, field_name, f"{prefix}.security")
+    _require_enum(
+        security,
+        "output_classification",
+        DataClassification,
+        f"{prefix}.security",
+    )
+    _require_enum(
+        security,
+        "maximum_input_classification",
+        DataClassification,
+        f"{prefix}.security",
+    )
+    _require_type(security, "trust_zone", str, "string", prefix=f"{prefix}.security")
+    _require_type(
+        security,
+        "confidential_compute_required",
+        bool,
+        "boolean",
+        prefix=f"{prefix}.security",
+    )
+
+
+def _require_enum(
+    container: Mapping[str, Any], field_name: str, enum_type: type, prefix: str
+) -> None:
+    _require_type(container, field_name, str, "string", prefix=prefix)
+    if container[field_name] not in {item.value for item in enum_type}:
+        raise DNCValidationError(f"{prefix}.{field_name} is unsupported")
+
+
+def _require_nullable_string(
+    container: Mapping[str, Any], field_name: str, prefix: str
+) -> None:
+    if field_name not in container:
+        raise DNCValidationError(f"{prefix}.{field_name} is required")
+    if container[field_name] is not None and not isinstance(container[field_name], str):
+        raise DNCValidationError(f"{prefix}.{field_name} MUST be a string or null")
+    if isinstance(container[field_name], str) and not container[field_name].strip():
+        raise DNCValidationError(f"{prefix}.{field_name} MUST be non-empty when provided")
+
+
+def _require_string_array(
+    container: Mapping[str, Any], field_name: str, prefix: str
+) -> None:
+    _require_type(container, field_name, list, "array", prefix=prefix)
+    values = container[field_name]
+    if any(not isinstance(value, str) or not value.strip() for value in values):
+        raise DNCValidationError(f"{prefix}.{field_name} MUST contain non-empty strings")
+    if len(values) != len(set(values)):
+        raise DNCValidationError(f"{prefix}.{field_name} MUST contain unique strings")
 
 
 def _require_type(

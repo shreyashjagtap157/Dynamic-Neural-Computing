@@ -13,6 +13,7 @@ from typing import Any, Callable
 from dnc.cognition.canonical import canonical_data
 from dnc.execution.execution_provider import ExecutionCapability, ExecutionProvider, ProviderResult
 from dnc.kernel.errors import DNCCancellationError, DNCCleanupError, DNCExecutionError
+from dnc.kernel.contracts import EffectType, IsolationGrade
 from dnc.ir.graph import StructuralGraph
 from dnc.ir.serialization import DNWIRSerializer
 
@@ -29,27 +30,6 @@ class ReproducibilityGrade(str, Enum):
     R2_DETERMINISTIC_CORE = "R2_DETERMINISTIC_CORE"
     R3_RECORDED_EXTERNALS = "R3_RECORDED_EXTERNALS"
     R4_ENVIRONMENT_REPLAY = "R4_ENVIRONMENT_REPLAY"
-
-
-class IsolationGrade(str, Enum):
-    """State isolation grade for counterfactual execution."""
-
-    I0_NONE = "I0_NONE"
-    I1_GRAPH_ONLY = "I1_GRAPH_ONLY"
-    I2_PROCESS_LOCAL = "I2_PROCESS_LOCAL"
-    I3_RECORDED_EXTERNALS = "I3_RECORDED_EXTERNALS"
-    I4_SANDBOXED_ENVIRONMENT = "I4_SANDBOXED_ENVIRONMENT"
-
-
-class EffectType(str, Enum):
-    """External effect class tracked by the Phase 2 effect ledger."""
-
-    PROVIDER_CALL = "PROVIDER_CALL"
-    FILE_WRITE = "FILE_WRITE"
-    DATABASE_WRITE = "DATABASE_WRITE"
-    NETWORK_CALL = "NETWORK_CALL"
-    CACHE_WRITE = "CACHE_WRITE"
-    CLEANUP = "CLEANUP"
 
 
 class SharedStateKind(str, Enum):

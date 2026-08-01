@@ -6,7 +6,14 @@ Implements ComputationalUnit, three orthogonal dimensions, contracts, capabiliti
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Any, List, Set
-from .contracts import PortContract
+from dnc.kernel.contracts import SideEffectClass
+from .contracts import (
+    IdempotencyContract,
+    PlacementContract,
+    PortContract,
+    SecurityContract,
+    SideEffectContract,
+)
 from .identity import UnitID
 
 class StructureDimension(str, Enum):
@@ -34,6 +41,10 @@ class UnitContract:
     postconditions: List[str] = field(default_factory=list)
     resource_limits: Dict[str, Any] = field(default_factory=dict)
     ports: List[PortContract] = field(default_factory=list)
+    idempotency: IdempotencyContract = field(default_factory=IdempotencyContract)
+    side_effects: SideEffectContract = field(default_factory=SideEffectContract)
+    placement: PlacementContract = field(default_factory=PlacementContract)
+    security: SecurityContract = field(default_factory=SecurityContract)
 
     def port(self, port_id: str) -> PortContract | None:
         return next((port for port in self.ports if port.port_id == port_id), None)
@@ -43,6 +54,22 @@ class UnitContract:
             return False
         identifiers = [port.port_id for port in self.ports]
         return len(identifiers) == len(set(identifiers))
+
+    def requires_execution_context(self) -> bool:
+        return bool(
+            self.side_effects.classification is not SideEffectClass.NONE
+            or self.placement.allowed_regions
+            or self.placement.allowed_devices
+            or self.placement.allowed_runtimes
+            or self.placement.required_capabilities
+            or self.placement.requires_local_inputs
+            or self.security.tenant_id
+            or self.security.required_permissions
+            or self.security.allowed_residencies
+            or self.security.trust_zone
+            or self.security.accepted_trust_zones
+            or self.security.confidential_compute_required
+        )
 
 @dataclass
 class MutationContract:

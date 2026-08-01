@@ -10,10 +10,10 @@ from typing import Any
 from dnc.kernel.errors import DNCValidationError
 
 DNC_IR_SCHEMA_ID = "dnc.ir.structural_graph"
-DNC_IR_SCHEMA_VERSION = "1.2.0"
+DNC_IR_SCHEMA_VERSION = "1.3.0"
 KERNEL_COMPATIBILITY_VERSION = "2026.07.phase1"
 COMPATIBILITY_POLICY_VERSION = "1"
-SUPPORTED_DNC_IR_SCHEMA_VERSIONS = frozenset({"1.1.0", DNC_IR_SCHEMA_VERSION})
+SUPPORTED_DNC_IR_SCHEMA_VERSIONS = frozenset({"1.1.0", "1.2.0", DNC_IR_SCHEMA_VERSION})
 
 _SCHEMA_HEADER_FIELDS = frozenset(
     {"schema_id", "schema_version", "compatibility_version"}

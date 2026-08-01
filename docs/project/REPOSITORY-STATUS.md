@@ -17,7 +17,7 @@ reference implementations unless their deployment profiles explicitly bind quali
 
 ## Current verified baseline
 
-- The authoritative pytest suite passes **422 tests**, with **2 intentional environment-dependent skips**.
+- The authoritative pytest suite passes **430 tests**, with **2 intentional environment-dependent skips**.
 - The Phase 12 canonical lifecycle audit passes **8/8**.
 - The Phase 13 benchmark harness integrity audit passes **3/3**.
 - Production source passes Ruff and Python byte-compilation.
@@ -63,6 +63,9 @@ Test success establishes the implemented behavior only. It does not establish em
 21. Evolved Generic DNC-IR to schema 1.2.0 with typed ports, data/control/state/resource edge
     contracts, cardinality/schema/direction/kind validation, projection and mutation propagation,
     and explicit 1.1.0 read compatibility.
+22. Evolved Generic DNC-IR to schema 1.3.0 with enforced idempotency, effect, placement, tenant,
+    permission, classification, residency, trust-zone, isolation, and confidential-compute contracts;
+    governed graphs now require a satisfying execution context before projection.
 
 ## Known critical gaps
 

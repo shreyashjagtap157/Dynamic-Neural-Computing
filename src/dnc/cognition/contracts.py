@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from dnc.kernel.contracts import SideEffectClass
+
 from dnc.cognition.canonical import COGNITIVE_SCHEMA_VERSION, canonical_hash, normalize_text
 
 
@@ -81,13 +83,6 @@ class EnforcementTier(str, Enum):
     CONSTRAINT = "CONSTRAINT"
     POLICY = "POLICY"
     PREFERENCE = "PREFERENCE"
-
-
-class SideEffectClass(str, Enum):
-    NONE = "NONE"
-    REVERSIBLE = "REVERSIBLE"
-    COMPENSATABLE = "COMPENSATABLE"
-    IRREVERSIBLE = "IRREVERSIBLE"
 
 
 class EvidenceSourceType(str, Enum):
