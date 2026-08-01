@@ -4,6 +4,7 @@ Implements canonical JSON / dict export and import for StructuralGraph.
 """
 
 import json
+from copy import deepcopy
 from dataclasses import asdict
 from typing import Dict, Any
 from dnc.kernel.versioning import schema_header
@@ -11,6 +12,7 @@ from dnc.ir.schema import validate_ir_document
 from .graph import StructuralGraph, Edge, EdgeType
 from .identity import GraphID, GraphVersion, UnitID
 from .unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension, UnitContract, MutationContract, Constraint, EnforcementTier
+from .contracts import PortCardinality, PortContract, PortDirection, PortKind
 
 class DNWIRSerializer:
     """
@@ -42,7 +44,24 @@ class DNWIRSerializer:
                 "structure": u.structure.value,
                 "visibility": u.visibility.value,
                 "lifecycle": u.lifecycle.value,
-                "contract": asdict(u.contract),
+                "contract": {
+                    "input_schema": deepcopy(u.contract.input_schema),
+                    "output_schema": deepcopy(u.contract.output_schema),
+                    "preconditions": deepcopy(u.contract.preconditions),
+                    "postconditions": deepcopy(u.contract.postconditions),
+                    "resource_limits": deepcopy(u.contract.resource_limits),
+                    "ports": [
+                        {
+                            "port_id": port.port_id,
+                            "direction": port.direction.value,
+                            "kind": port.kind.value,
+                            "schema": deepcopy(port.schema),
+                            "cardinality": port.cardinality.value,
+                            "description": port.description,
+                        }
+                        for port in u.contract.ports
+                    ],
+                },
                 "mutation_contract": {
                     **asdict(u.mutation_contract),
                     "allowed_mutations": sorted(u.mutation_contract.allowed_mutations),
@@ -59,7 +78,9 @@ class DNWIRSerializer:
                 "source": e.source.value,
                 "target": e.target.value,
                 "edge_type": e.edge_type.value,
-                "metadata": e.metadata
+                "metadata": e.metadata,
+                "source_port": e.source_port,
+                "target_port": e.target_port,
             })
 
         return data
@@ -95,8 +116,24 @@ class DNWIRSerializer:
                 sub_units=[UnitID(s) for s in u_data.get("sub_units", [])],
                 metadata=u_data.get("metadata", {})
             )
-            c_data = u_data.get("contract", {})
-            u.contract = UnitContract(**c_data)
+            c_data = dict(u_data.get("contract", {}))
+            port_data = c_data.pop("ports", [])
+            u.contract = UnitContract(
+                **c_data,
+                ports=[
+                    PortContract(
+                        port_id=port["port_id"],
+                        direction=PortDirection(port["direction"]),
+                        kind=PortKind(port["kind"]),
+                        schema=port.get("schema", {}),
+                        cardinality=PortCardinality(
+                            port.get("cardinality", PortCardinality.EXACTLY_ONE.value)
+                        ),
+                        description=port.get("description", ""),
+                    )
+                    for port in port_data
+                ],
+            )
             
             mc_data = u_data.get("mutation_contract", {})
             u.mutation_contract = MutationContract(
@@ -119,7 +156,9 @@ class DNWIRSerializer:
                 source=UnitID(e_data["source"]),
                 target=UnitID(e_data["target"]),
                 edge_type=EdgeType(e_data["edge_type"]),
-                metadata=e_data.get("metadata", {})
+                metadata=e_data.get("metadata", {}),
+                source_port=e_data.get("source_port"),
+                target_port=e_data.get("target_port"),
             )
             graph.add_edge(edge)
 

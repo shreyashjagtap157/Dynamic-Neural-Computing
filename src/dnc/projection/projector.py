@@ -78,7 +78,9 @@ class StructuralProjector:
                 source=e.source,
                 target=e.target,
                 edge_type=e.edge_type.value,
-                metadata=dict(e.metadata)
+                metadata=dict(e.metadata),
+                source_port=e.source_port,
+                target_port=e.target_port,
             ))
 
         return exec_dag, warnings

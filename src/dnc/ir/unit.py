@@ -6,6 +6,7 @@ Implements ComputationalUnit, three orthogonal dimensions, contracts, capabiliti
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, Any, List, Set
+from .contracts import PortContract
 from .identity import UnitID
 
 class StructureDimension(str, Enum):
@@ -32,6 +33,16 @@ class UnitContract:
     preconditions: List[str] = field(default_factory=list)
     postconditions: List[str] = field(default_factory=list)
     resource_limits: Dict[str, Any] = field(default_factory=dict)
+    ports: List[PortContract] = field(default_factory=list)
+
+    def port(self, port_id: str) -> PortContract | None:
+        return next((port for port in self.ports if port.port_id == port_id), None)
+
+    def validate_ports(self) -> bool:
+        if not all(isinstance(port, PortContract) for port in self.ports):
+            return False
+        identifiers = [port.port_id for port in self.ports]
+        return len(identifiers) == len(set(identifiers))
 
 @dataclass
 class MutationContract:

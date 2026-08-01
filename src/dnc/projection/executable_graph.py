@@ -19,6 +19,8 @@ class ExecutableEdge:
     target: UnitID
     edge_type: str
     metadata: Dict[str, Any] = field(default_factory=dict)
+    source_port: str | None = None
+    target_port: str | None = None
 
 @dataclass
 class ExecutableDAG:

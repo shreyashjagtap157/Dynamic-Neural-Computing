@@ -6,7 +6,7 @@
 
 **Starting commit:** `2b5fb84`
 
-**Current state:** M1 in progress; `M1-IR-001` complete
+**Current state:** M1 in progress; `M1-IR-001` and `M1-IR-002` complete
 
 ## Completed work package
 
@@ -23,29 +23,46 @@
 The completion commit is the commit titled `Add versioned Generic DNC-IR schema validation`; resolve
 its exact ID with `git log --oneline --grep='Add versioned Generic DNC-IR schema validation' -1`.
 
+### M1-IR-002 — Typed ports and edge contracts
+
+- Evolves canonical Generic DNC-IR output from 1.1.0 to 1.2.0 while retaining both packaged schemas.
+- Adds frozen port records with per-unit identity, input/output direction,
+  data/control/state/resource kinds, JSON-like
+  data contracts, and explicit one/optional/many cardinalities.
+- Requires complete source/target bindings for typed units and rejects missing ports, wrong direction,
+  edge-kind mismatch, schema mismatch, duplicate edges, and cardinality violations.
+- Preserves untyped legacy units and edges, and explicitly reads versioned 1.1.0 documents with empty
+  port defaults.
+- Propagates port bindings through deterministic serialization, executable projection, structural
+  connect/disconnect, compensation, and rewire operations.
+
+The completion commit is the commit titled `Add typed DNC-IR ports and edge contracts`; resolve its
+exact ID with `git log --oneline --grep='Add typed DNC-IR ports and edge contracts' -1`.
+
 ## Verification evidence
 
-- `python -W error -m pytest -q`: 410 passed, 2 intentional environment-dependent skips.
+- `python -W error -m pytest -q`: 422 passed, 2 intentional environment-dependent skips.
 - `python -m compileall -q src`: passed.
 - `python -m ruff check src tests tools/generate_conformance_report.py`: passed.
 - `PYTHONPATH=src python scripts/audits/phase12_system_audit.py`: 8/8 passed.
 - Specification reference and RFC 2119 checks: passed.
 - Architecture conformance: 30/30 invariants covered, 34/34 tests passed, 4/4 ACDs resolved.
-- A locally built wheel contains `dnc/schemas/structural-graph-1.1.0.schema.json`.
+- A locally built wheel contains both supported 1.1.0 and 1.2.0 structural-graph schemas.
 
 ## Claims and residual risks
 
-This work supports a versioned and packaged Generic DNC-IR envelope. It does not yet support schema
-migration between versioned formats, nor does it complete M1's typed port, edge, effect, placement,
-security, SDK, registry, property, fuzz, concurrency, or failure-testing commitments. The headerless
-legacy path is intentionally less strict and should be migrated before any future removal.
+This work supports a versioned and packaged Generic DNC-IR envelope plus typed port/edge validation.
+It does not yet provide a general schema migration framework beyond the explicit 1.1.0 reader, nor
+does it complete M1's effect, placement, security, SDK, registry, property, fuzz, concurrency, or
+failure-testing commitments. The headerless legacy path is intentionally less strict and should be
+migrated before any future removal.
 
-Rollback is a revert of the completion commit; serialized output remains byte-identical because the
-canonical 1.1.0 header and graph payload were not changed.
+Rollback of `M1-IR-002` returns canonical output to 1.1.0; consumers needing rollback must avoid
+persisting 1.2.0-only port bindings or first project them to an explicitly untyped legacy profile.
 
 ## Exact next point
 
-Implement `M1-IR-002`: typed input/output ports and validated data, control, state, and resource edge
-contracts. Preserve current `Edge(source, target, edge_type, metadata)` construction through additive
-defaults or an explicit migration adapter, add canonical serialization/golden vectors, and reject
-port-direction, kind, schema, and cardinality mismatches before executable projection.
+Implement `M1-IR-003`: idempotency, side-effect, placement, and security contracts. Bind declarations
+to units and validate cross-edge requirements without treating policy preferences as hard invariants.
+Preserve untyped 1.1.0 reads, evolve the canonical schema deliberately, and propagate declarations
+through serialization, mutation, projection, snapshot, and authorization boundaries.

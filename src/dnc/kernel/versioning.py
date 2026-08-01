@@ -10,10 +10,10 @@ from typing import Any
 from dnc.kernel.errors import DNCValidationError
 
 DNC_IR_SCHEMA_ID = "dnc.ir.structural_graph"
-DNC_IR_SCHEMA_VERSION = "1.1.0"
+DNC_IR_SCHEMA_VERSION = "1.2.0"
 KERNEL_COMPATIBILITY_VERSION = "2026.07.phase1"
 COMPATIBILITY_POLICY_VERSION = "1"
-SUPPORTED_DNC_IR_SCHEMA_VERSIONS = frozenset({DNC_IR_SCHEMA_VERSION})
+SUPPORTED_DNC_IR_SCHEMA_VERSIONS = frozenset({"1.1.0", DNC_IR_SCHEMA_VERSION})
 
 _SCHEMA_HEADER_FIELDS = frozenset(
     {"schema_id", "schema_version", "compatibility_version"}
@@ -28,6 +28,9 @@ class SchemaVersion:
     major: int
     minor: int
     patch: int
+
+    def __str__(self) -> str:
+        return f"{self.major}.{self.minor}.{self.patch}"
 
     @classmethod
     def parse(cls, value: str) -> "SchemaVersion":

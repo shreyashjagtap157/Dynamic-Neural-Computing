@@ -43,6 +43,7 @@ def test_packaged_schema_identifies_the_current_generic_ir_contract() -> None:
     assert schema["$id"].endswith(f":{DNC_IR_SCHEMA_VERSION}")
     assert schema["properties"]["schema_id"]["const"] == DNC_IR_SCHEMA_ID
     assert {"units", "edges", "version"}.issubset(schema["required"])
+    assert structural_graph_schema("1.1.0")["$id"].endswith(":1.1.0")
 
 
 @pytest.mark.parametrize(
@@ -96,3 +97,35 @@ def test_minimal_headerless_legacy_document_keeps_original_defaults() -> None:
     assert restored.version == GraphVersion()
     assert restored.units == {}
     assert restored.edges == []
+
+
+def test_versioned_1_1_document_migrates_with_empty_port_defaults() -> None:
+    data = _document()
+    data["schema_version"] = "1.1.0"
+    for unit in data["units"].values():
+        unit["contract"].pop("ports")
+    for edge in data["edges"]:
+        edge.pop("source_port")
+        edge.pop("target_port")
+
+    restored = DNWIRSerializer.from_dict(data)
+
+    assert all(unit.contract.ports == [] for unit in restored.units.values())
+    assert restored.edges[0].source_port is None
+
+
+def test_versioned_1_2_document_rejects_malformed_port_contracts() -> None:
+    data = _document()
+    data["units"]["source"]["contract"]["ports"] = [
+        {
+            "port_id": "out",
+            "direction": "SIDEWAYS",
+            "kind": "DATA",
+            "schema": {"type": "string"},
+            "cardinality": "EXACTLY_ONE",
+            "description": "",
+        }
+    ]
+
+    with pytest.raises(DNCValidationError, match="direction is unsupported"):
+        DNWIRSerializer.from_dict(data)

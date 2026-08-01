@@ -3,6 +3,7 @@ DNC Mutation Engine (Mutation Semantics & Transaction Semantics)
 Applies authorized structural operations to StructuralGraphs and records inverse compensation.
 """
 
+from dataclasses import replace
 from typing import Tuple, List, Optional
 from dnc.ir.graph import StructuralGraph, Edge, EdgeType
 from dnc.ir.operations import IROperation, OperationType
@@ -57,16 +58,33 @@ class MutationEngine:
                 target: UnitID = operation.parameters["target"]
                 edge_type: EdgeType = operation.parameters["edge_type"]
                 metadata = operation.parameters.get("metadata", {})
+                source_port = operation.parameters.get("source_port")
+                target_port = operation.parameters.get("target_port")
                 
-                edge = Edge(source=source, target=target, edge_type=edge_type, metadata=metadata)
+                edge = Edge(
+                    source=source,
+                    target=target,
+                    edge_type=edge_type,
+                    metadata=metadata,
+                    source_port=source_port,
+                    target_port=target_port,
+                )
                 graph.add_edge(edge)
                 # Inverse of CONNECT_UNITS is DISCONNECT_UNITS
-                undo_log.push(InverseOperation("DISCONNECT_UNITS", {"source": source, "target": target, "edge_type": edge_type}))
+                undo_log.push(InverseOperation("DISCONNECT_UNITS", {
+                    "source": source,
+                    "target": target,
+                    "edge_type": edge_type,
+                    "source_port": source_port,
+                    "target_port": target_port,
+                }))
 
             elif operation.op_type == OperationType.DISCONNECT_UNITS:
                 source: UnitID = operation.parameters["source"]
                 target: UnitID = operation.parameters["target"]
                 edge_type: Optional[EdgeType] = operation.parameters.get("edge_type", None)
+                source_port = operation.parameters.get("source_port")
+                target_port = operation.parameters.get("target_port")
                 
                 # Find matching edges to remove
                 removed_edges = []
@@ -75,6 +93,10 @@ class MutationEngine:
                     match = (e.source.value == source.value and e.target.value == target.value)
                     if edge_type:
                         match = match and (e.edge_type == edge_type)
+                    if source_port is not None:
+                        match = match and e.source_port == source_port
+                    if target_port is not None:
+                        match = match and e.target_port == target_port
                     if match:
                         removed_edges.append(e)
                     else:
@@ -91,10 +113,9 @@ class MutationEngine:
                 
                 # Find and update edge
                 found = False
-                for e in graph.edges:
+                for index, e in enumerate(graph.edges):
                     if e.source.value == old_source.value and e.target.value == old_target.value:
-                        e.source = new_source
-                        e.target = new_target
+                        graph.edges[index] = replace(e, source=new_source, target=new_target)
                         found = True
                         break
                 if not found:
@@ -126,7 +147,13 @@ class MutationEngine:
                 for e in inv.parameters.get("edges", []):
                     graph.add_edge(e)
             elif inv.op_name == "DISCONNECT_UNITS":
-                graph.remove_edge(inv.parameters["source"], inv.parameters["target"], inv.parameters.get("edge_type"))
+                graph.remove_edge(
+                    inv.parameters["source"],
+                    inv.parameters["target"],
+                    inv.parameters.get("edge_type"),
+                    inv.parameters.get("source_port"),
+                    inv.parameters.get("target_port"),
+                )
             elif inv.op_name == "RESTORE_EDGES":
                 for e in inv.parameters.get("edges", []):
                     graph.add_edge(e)
@@ -135,10 +162,9 @@ class MutationEngine:
                 old_t = inv.parameters["old_target"]
                 new_s = inv.parameters["new_source"]
                 new_t = inv.parameters["new_target"]
-                for e in graph.edges:
+                for index, e in enumerate(graph.edges):
                     if e.source.value == old_s.value and e.target.value == old_t.value:
-                        e.source = new_s
-                        e.target = new_t
+                        graph.edges[index] = replace(e, source=new_s, target=new_t)
                         break
         # Decrement version sequence or mark rollback in metadata
         graph.version = graph.version.next_sequence()

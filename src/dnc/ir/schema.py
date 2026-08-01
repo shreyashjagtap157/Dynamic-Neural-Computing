@@ -8,15 +8,20 @@ from importlib.resources import files
 from typing import Any
 
 from dnc.kernel.errors import DNCValidationError
-from dnc.kernel.versioning import DNC_IR_SCHEMA_VERSION, validate_schema_header
+from dnc.kernel.versioning import (
+    DNC_IR_SCHEMA_VERSION,
+    SUPPORTED_DNC_IR_SCHEMA_VERSIONS,
+    validate_schema_header,
+)
+from dnc.ir.contracts import PortCardinality, PortDirection, PortKind
 
 
-def structural_graph_schema() -> dict[str, Any]:
+def structural_graph_schema(version: str = DNC_IR_SCHEMA_VERSION) -> dict[str, Any]:
     """Load the canonical schema shipped with the installed DNC package."""
 
-    resource = files("dnc.schemas").joinpath(
-        f"structural-graph-{DNC_IR_SCHEMA_VERSION}.schema.json"
-    )
+    if version not in SUPPORTED_DNC_IR_SCHEMA_VERSIONS:
+        raise DNCValidationError(f"no packaged DNC-IR schema for version {version!r}")
+    resource = files("dnc.schemas").joinpath(f"structural-graph-{version}.schema.json")
     return json.loads(resource.read_text(encoding="utf-8"))
 
 
@@ -65,12 +70,39 @@ def validate_ir_document(document: Mapping[str, Any]) -> None:
             )
         for field_name in ("name", "structure", "visibility", "lifecycle"):
             _require_type(unit, field_name, str, "string", prefix=f"units.{unit_key}")
+        if schema_version is not None and str(schema_version) == "1.2.0":
+            _require_type(unit, "contract", Mapping, "object", prefix=f"units.{unit_key}")
+            contract = unit["contract"]
+            _require_type(
+                contract, "ports", list, "array", prefix=f"units.{unit_key}.contract"
+            )
+            for index, port in enumerate(contract["ports"]):
+                prefix = f"units.{unit_key}.contract.ports.{index}"
+                if not isinstance(port, Mapping):
+                    raise DNCValidationError(f"{prefix} MUST be an object")
+                for field_name in ("port_id", "direction", "kind", "cardinality", "description"):
+                    _require_type(port, field_name, str, "string", prefix=prefix)
+                _require_type(port, "schema", Mapping, "object", prefix=prefix)
+                if port["direction"] not in {item.value for item in PortDirection}:
+                    raise DNCValidationError(f"{prefix}.direction is unsupported")
+                if port["kind"] not in {item.value for item in PortKind}:
+                    raise DNCValidationError(f"{prefix}.kind is unsupported")
+                if port["cardinality"] not in {item.value for item in PortCardinality}:
+                    raise DNCValidationError(f"{prefix}.cardinality is unsupported")
 
     for index, edge in enumerate(document.get("edges", [])):
         if not isinstance(edge, Mapping):
             raise DNCValidationError(f"edges.{index} MUST be an object")
         for field_name in ("source", "target", "edge_type"):
             _require_type(edge, field_name, str, "string", prefix=f"edges.{index}")
+        if schema_version is not None and str(schema_version) == "1.2.0":
+            for field_name in ("source_port", "target_port"):
+                if field_name not in edge:
+                    raise DNCValidationError(f"edges.{index}.{field_name} is required")
+                if edge[field_name] is not None and not isinstance(edge[field_name], str):
+                    raise DNCValidationError(
+                        f"edges.{index}.{field_name} MUST be a string or null"
+                    )
 
 
 def _require_type(

@@ -51,7 +51,7 @@ def test_canonical_json_golden_vector_is_stable() -> None:
     payload = DNWIRSerializer.to_json(_golden_graph())
 
     assert hashlib.sha256(payload.encode("utf-8")).hexdigest() == (
-        "2622d9ac51689358de42b2cf4431bcb877cb7d4c060fe123111f719d83f922fd"
+        "2c48428e2aed240fcef304d120840ac0b1aa14b3fc91b6d7b3d6c642544a138f"
     )
 
 

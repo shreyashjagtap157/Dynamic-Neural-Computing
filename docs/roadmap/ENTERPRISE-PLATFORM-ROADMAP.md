@@ -28,7 +28,8 @@ DNC will be a substrate-neutral, governed runtime for dynamically constructing, 
 ### M1 — Reliable generic runtime — IN PROGRESS
 
 - versioned Generic DNC-IR and schemas — **COMPLETE (`M1-IR-001`)**;
-- validated ports, data/control/state/resource edges, idempotency, side effects, placement and security contracts;
+- validated ports and data/control/state/resource edges — **COMPLETE (`M1-IR-002`)**;
+- idempotency, side-effect, placement, and security contracts;
 - atomic transaction/rollback and explicit replay grades;
 - plugin SDK, CLI, Python SDK, artifact and graph registry;
 - property, fuzz, concurrency, failure, and compatibility tests.
@@ -37,8 +38,11 @@ DNC will be a substrate-neutral, governed runtime for dynamically constructing, 
 compatibility-header validation, dependency-free envelope validation, explicit rejection of
 partial/future/foreign schema claims, and continued support for the frozen headerless legacy format.
 See [the M1 implementation status](M1-IMPLEMENTATION-STATUS.md) for validation evidence and handoff.
-The next dependency-ordered point is `M1-IR-002`: typed ports and edge-level data/control/state/resource
-contracts, followed by idempotency, side-effect, placement, and security declarations.
+`M1-IR-002` evolves the canonical interchange format to 1.2.0 with typed ports, explicit edge-port
+bindings, all four normative edge kinds, cardinality and schema validation, duplicate-edge rejection,
+projection/mutation propagation, and an explicit 1.1.0 read-compatibility path.
+The next dependency-ordered point is `M1-IR-003`: idempotency, side-effect, placement, and security
+contracts.
 
 ### M2 — Real LLM reasoning runtime
 

@@ -14,6 +14,7 @@ class EdgeType(str, Enum):
     CONTROL = "CONTROL"
     STATE = "STATE"
     DEPENDENCY = "DEPENDENCY"
+    RESOURCE = "RESOURCE"
 
 @dataclass(frozen=True)
 class Edge:
@@ -21,6 +22,8 @@ class Edge:
     target: UnitID
     edge_type: EdgeType
     metadata: Dict[str, Any] = field(default_factory=dict)
+    source_port: str | None = None
+    target_port: str | None = None
 
 @dataclass
 class StructuralGraph:
@@ -49,12 +52,23 @@ class StructuralGraph:
         # endpoints before projection or transaction commit.
         self.edges.append(edge)
 
-    def remove_edge(self, source: UnitID, target: UnitID, edge_type: Optional[EdgeType] = None) -> None:
+    def remove_edge(
+        self,
+        source: UnitID,
+        target: UnitID,
+        edge_type: Optional[EdgeType] = None,
+        source_port: str | None = None,
+        target_port: str | None = None,
+    ) -> None:
         new_edges = []
         for e in self.edges:
             matches = (e.source.value == source.value and e.target.value == target.value)
             if edge_type:
                 matches = matches and (e.edge_type == edge_type)
+            if source_port is not None:
+                matches = matches and e.source_port == source_port
+            if target_port is not None:
+                matches = matches and e.target_port == target_port
             if not matches:
                 new_edges.append(e)
         self.edges = new_edges
