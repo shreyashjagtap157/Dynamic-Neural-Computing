@@ -1,9 +1,7 @@
-import pytest
 from dnc.ir.identity import GraphID, UnitID, GraphVersion
 from dnc.ir.unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension
 from dnc.ir.graph import StructuralGraph, Edge, EdgeType
 from dnc.projection.projector import StructuralProjector
-from dnc.projection.executable_graph import ExecutableDAG
 
 def test_structural_projector_deterministic():
     g = StructuralGraph(graph_id=GraphID("g_proj"), version=GraphVersion(1, 0, 0, 1))

@@ -1,7 +1,6 @@
-import pytest
 from dnc.ir.identity import GraphID, UnitID
 from dnc.ir.unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension
-from dnc.ir.graph import StructuralGraph, Edge, EdgeType
+from dnc.ir.graph import StructuralGraph
 from dnc.projection.projector import StructuralProjector
 from dnc.runtime.runtime import DNCRuntime
 from dnc.state.registry import ModuleRegistry

@@ -1,0 +1,7 @@
+{
+  "positive_transfer": 0.20,
+  "harmful_transfer": 0.01,
+  "stale_retrieval_rate": 0.0,
+  "poisoning_block_rate": 1.0,
+  "continuity": 1.0
+}

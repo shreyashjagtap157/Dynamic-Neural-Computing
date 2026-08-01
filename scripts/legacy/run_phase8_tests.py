@@ -9,10 +9,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from dnc.ir.graph import StructuralGraph
-from dnc.ir.identity import GraphID, UnitID
-from dnc.ir.unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension
-from dnc.ir.operations import IROperation, OperationType
-from dnc.dcc.dcc_contracts import MutationProposal, AuthorizationDecision
+from dnc.ir.identity import GraphID
+from dnc.dcc.dcc_contracts import MutationProposal
 from dnc.dcc.structural_controller import (
     StructuralController, DecisionType, EvaluationCriteria,
     ProposalEvaluation, EvaluationContext
@@ -258,7 +256,7 @@ def test_authorize_converts_evaluation():
     )
     context = EvaluationContext(current_graph=graph, available_budget=100.0)
     decision = ctrl.authorize(evaluation, context)
-    assert decision.authorized == True
+    assert decision.authorized
     assert decision.proposal_id == "auth_convert"
     print("PASS: test_authorize_converts_evaluation")
 
@@ -283,7 +281,7 @@ def test_authorize_reject_fails():
     )
     context = EvaluationContext(current_graph=graph, available_budget=100.0)
     decision = ctrl.authorize(evaluation, context)
-    assert decision.authorized == False
+    assert not decision.authorized
     print("PASS: test_authorize_reject_fails")
 
 def test_authorize_top_scoring():

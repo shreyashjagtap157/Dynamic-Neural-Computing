@@ -11,15 +11,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from dnc.ir.graph import StructuralGraph
 from dnc.ir.identity import GraphID, UnitID
 from dnc.ir.unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension
-from dnc.ir.operations import IROperation, OperationType
-from dnc.dcc.computation_generator import ComputationGenerator, GenerationObjective, GenerationContext
+from dnc.dcc.computation_generator import ComputationGenerator, GenerationObjective
 from dnc.dcc.structural_controller import StructuralController, EvaluationCriteria, EvaluationContext
 from dnc.dcc.learning_engine import DeterministicLearningPolicy, PredictionTracker, GeneratorInfluence
 from dnc.dcc.assessment_engine import Assessment, ExecutionResult
 from dnc.dcc.dcc_contracts import MutationProposal, AuthorizationDecision
 from dnc.dcc.learned_adaptation import (
     LearnedStructuralAdaptation, LearnedGenerationContext, LearnedEvaluationContext,
-    AdaptationCycleResult, LearnedAdaptationIntegration
+    LearnedAdaptationIntegration
 )
 
 
@@ -93,8 +92,8 @@ def test_learning_changes_future_proposal_ranking():
             graph, gen_ctx2, eval_ctx2, prior_assessment=prior_assessment
         )
 
-        assert cycle2_result.learning_applied == True
-        assert cycle2_result.proposal_ranked_by_learning == True
+        assert cycle2_result.learning_applied
+        assert cycle2_result.proposal_ranked_by_learning
         assert cycle1_result.proposal.proposal_id != cycle2_result.proposal.proposal_id
 
     print("PASS: test_learning_changes_future_proposal_ranking")
@@ -183,7 +182,7 @@ def test_controller_authority_remains_intact():
         result = adaptation.execute_adaptation_cycle(graph, gen_ctx, eval_ctx)
 
         if result.authorization:
-            assert result.authorization.authorized == True or result.authorization.rejection_reason is not None
+            assert result.authorization.authorized or result.authorization.rejection_reason is not None
 
     assert adaptation.get_cycle_count() == 3
     print("PASS: test_controller_authority_remains_intact")
@@ -400,7 +399,7 @@ def test_learning_state_can_be_checkpoint_restored():
     tracker = PredictionTracker()
 
     adaptation2 = LearnedStructuralAdaptation(gen, ctrl, DeterministicLearningPolicy(), tracker)
-    graph2 = StructuralGraph(GraphID("checkpoint_g2"))
+    StructuralGraph(GraphID("checkpoint_g2"))
 
     knowledge_after_reset = adaptation2.learning.get_knowledge()
     assert knowledge_after_reset.cycle_count == 0
@@ -450,7 +449,7 @@ def test_bad_learned_policy_cannot_bypass_safety():
         result = adaptation.execute_adaptation_cycle(graph, gen_ctx, eval_ctx)
 
         if result.authorization and result.authorization.authorized:
-            assert result.safety_constraints_satisfied == True
+            assert result.safety_constraints_satisfied
 
     assert len(graph.units) <= 1
     print("PASS: test_bad_learned_policy_cannot_bypass_safety")
@@ -513,10 +512,10 @@ def test_system_distinguishes_learned_from_explicit():
 
     learned_result = adaptation.execute_adaptation_cycle(graph, learned_gen_ctx, learned_eval_ctx)
 
-    assert explicit_result.safety_constraints_satisfied == True
-    assert learned_result.safety_constraints_satisfied == True
-    assert explicit_result.authorization.rejection_reason is not None or explicit_result.authorization.authorized == True
-    assert learned_result.authorization.rejection_reason is not None or learned_result.authorization.authorized == True
+    assert explicit_result.safety_constraints_satisfied
+    assert learned_result.safety_constraints_satisfied
+    assert explicit_result.authorization.rejection_reason is not None or explicit_result.authorization.authorized
+    assert learned_result.authorization.rejection_reason is not None or learned_result.authorization.authorized
     print("PASS: test_system_distinguishes_learned_from_explicit")
 
 
@@ -645,7 +644,7 @@ def test_learned_proposal_influence_via_generator():
 
     result = adaptation.execute_adaptation_cycle(graph, gen_ctx, eval_ctx)
 
-    assert result.learning_applied == True
+    assert result.learning_applied
     assert len(result.proposal.candidate_operations) > 0
     print("PASS: test_learned_proposal_influence_via_generator")
 
@@ -691,7 +690,7 @@ def test_controller_rejects_overriding_learning():
 
     result = adaptation.execute_adaptation_cycle(graph, gen_ctx, eval_ctx)
 
-    assert result.safety_constraints_satisfied == True
+    assert result.safety_constraints_satisfied
     if result.authorization and result.authorization.authorized:
         assert result.proposal.expected_utility >= 0.9
     print("PASS: test_controller_rejects_overriding_learning")

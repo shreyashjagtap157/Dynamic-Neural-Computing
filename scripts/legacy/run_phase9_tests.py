@@ -11,12 +11,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from dnc.ir.graph import StructuralGraph
 from dnc.ir.identity import GraphID, UnitID
 from dnc.ir.unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension
-from dnc.ir.operations import IROperation, OperationType
-from dnc.dcc.dcc_contracts import MutationProposal, AuthorizationDecision
-from dnc.dcc.structural_controller import StructuralController, DecisionType, EvaluationCriteria, EvaluationContext
+from dnc.dcc.dcc_contracts import MutationProposal
+from dnc.dcc.structural_controller import StructuralController, EvaluationCriteria, EvaluationContext
 from dnc.dcc.computation_generator import ComputationGenerator, GenerationObjective, GenerationContext
 from dnc.dcc.assessment_engine import (
-    AssessmentEngine, ExecutionResult, Assessment, AdaptationKnowledge,
+    AssessmentEngine, ExecutionResult, AdaptationKnowledge,
     DCCLAssessmentContext, DCCLClosedLoopOrchestrator
 )
 from dnc.mutation.engine import MutationEngine
@@ -56,7 +55,7 @@ def test_execution_result():
     assert result.graph_id == "test_g"
     assert result.execution_time_ms == 15.5
     assert result.metrics["utility"] == 0.82
-    assert result.success == True
+    assert result.success
     print("PASS: test_execution_result")
 
 def test_assessment_creation():
@@ -142,7 +141,7 @@ def test_should_adapt_positive():
     proposal = MutationProposal(proposal_id="p1", target_graph_id="g", candidate_operations=[], expected_utility=0.6)
     engine = AssessmentEngine()
     assessment = engine.assess_execution(result, proposal, "v0", "v1")
-    assert engine.should_adapt(assessment, threshold=0.1) == False
+    assert not engine.should_adapt(assessment, threshold=0.1)
     print("PASS: test_should_adapt_positive")
 
 def test_should_adapt_negative():
@@ -151,7 +150,7 @@ def test_should_adapt_negative():
     proposal = MutationProposal(proposal_id="p1", target_graph_id="g", candidate_operations=[], expected_utility=0.6)
     engine = AssessmentEngine()
     assessment = engine.assess_execution(result, proposal, "v0", "v1")
-    assert engine.should_adapt(assessment, threshold=0.1) == True
+    assert engine.should_adapt(assessment, threshold=0.1)
     print("PASS: test_should_adapt_negative")
 
 def test_epistemic_distinction():
@@ -310,7 +309,7 @@ def test_closed_loop_proposal_lifecycle():
         assert assessment.assessment_id.startswith("assess_")
         assert assessment.execution_result is not None
         assert assessment.post_execution_utility_measured == 0.8
-    print(f"PASS: test_closed_loop_proposal_lifecycle")
+    print("PASS: test_closed_loop_proposal_lifecycle")
 
 def test_no_proposals_no_assessment():
     """When no proposals generated, no assessment occurs."""

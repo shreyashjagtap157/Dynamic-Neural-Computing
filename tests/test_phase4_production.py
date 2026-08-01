@@ -18,12 +18,8 @@ sys.path.insert(0, "src")
 
 from dnc.observability.bias_evaluation import (
     BiasEvaluationFramework,
-    BiasEvaluationResult,
     BiasViolationException,
     GroupedPredictions,
-    dp_a_rate,
-    dp_b_rate,
-    tpr_fpr,
 )
 from dnc.runtime.runtime import (
     RegressionMonitor,
@@ -58,13 +54,13 @@ def test_ec2_regression_monitor_detects_class1_regression():
         "scenario_2": {"latency": "TIE"},
     }
 
-    current = MockEvaluationRun({
+    MockEvaluationRun({
         "accuracy": "LOSS",
         "latency": "TIE",
     })
 
     from dnc.observability.evaluation import EvaluationSuite, EvaluationRun, MetricSpec, TrialResult
-    suite = EvaluationSuite()
+    EvaluationSuite()
 
     eval_run = EvaluationRun(
         trial_results=[

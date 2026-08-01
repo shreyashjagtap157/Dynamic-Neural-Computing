@@ -20,7 +20,7 @@ import sys
 
 sys.path.insert(0, "src")
 
-from dnc.runtime.types import Buffer, ModuleInstanceID, ModuleTypeID
+from dnc.runtime.types import Buffer, ModuleInstanceID
 from dnc.state.execution_state import ExecutionState
 from dnc.state.working_memory import WorkingMemory
 from dnc.state.checkpoint import Checkpoint

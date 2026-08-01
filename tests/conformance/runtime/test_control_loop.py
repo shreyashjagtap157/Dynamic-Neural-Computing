@@ -15,7 +15,6 @@ import sys
 sys.path.insert(0, "src")
 
 from dnc.runtime.types import (
-    Buffer,
     ModuleInstanceID,
     ModuleTypeID,
     ModuleContract,
@@ -28,7 +27,7 @@ from dnc.state.checkpoint import CheckpointRecord
 from dnc.state.registry import ModuleRegistry
 from dnc.scheduler.scheduler import Scheduler
 from dnc.planner.pipeline import ExecutionGraph, VertexAssignment
-from dnc.runtime.runtime import Runtime, Decision, ExecutionState2
+from dnc.runtime.runtime import Runtime, ExecutionState2
 
 
 def _build_linear_runtime() -> tuple[Runtime, ExecutionState, dict]:

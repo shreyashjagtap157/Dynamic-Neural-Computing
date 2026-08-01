@@ -1,7 +1,6 @@
-import pytest
 from dnc.ir.identity import GraphID, UnitID, GraphVersion
 from dnc.ir.unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension
-from dnc.ir.graph import StructuralGraph, EdgeType
+from dnc.ir.graph import StructuralGraph
 from dnc.ir.operations import IROperation, OperationType
 from dnc.transaction.manager import TransactionManager
 from dnc.transaction.context import TransactionState

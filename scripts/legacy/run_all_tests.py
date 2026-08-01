@@ -43,7 +43,7 @@ for suite_name, module_path, class_name in test_modules:
 
 # Summary
 print(f"\n{'='*60}")
-print(f"  SUMMARY")
+print("  SUMMARY")
 print(f"{'='*60}")
 
 passed = sum(1 for r in all_results if r[0] == "PASS")
@@ -55,7 +55,7 @@ print(f"\n  Total: {total}  Passed: {passed}  Failed: {failed}  Errors: {errors}
 print(f"  Pass rate: {passed/total*100:.1f}%" if total > 0 else "  No tests run")
 
 if failed > 0 or errors > 0:
-    print(f"\n  FAILURES:")
+    print("\n  FAILURES:")
     for r in all_results:
         if r[0] != "PASS":
             print(f"    [{r[0]}] {r[1]} ({r[2]}): {r[3]}")

@@ -17,13 +17,9 @@ from dnc.runtime.types import (
     ModuleInstanceID,
     ModuleTypeID,
     ModuleContract,
-    UNBOUND,
-    PENDING,
-    UNBOUND_TYPE,
-    PENDING_TYPE,
 )
 from dnc.state.execution_state import ExecutionState
-from dnc.state.working_memory import WorkingMemory
+from dnc.state.working_memory import HistoryLog, WorkingMemory
 from dnc.state.checkpoint import Checkpoint, CheckpointRecord
 from dnc.state.registry import ModuleRegistry
 from dnc.scheduler.scheduler import Scheduler
@@ -31,12 +27,18 @@ from dnc.planner.pipeline import ExecutionGraph, VertexAssignment
 from dnc.runtime.runtime import Runtime, Decision, ExecutionState2
 from dnc.observability.provenance import ProvenanceLog, EventType
 from dnc.modules.standard import SourceModule, TransformModule, AggregateModule, SinkModule
-from dnc.execution.execution_trace import ExecutionTrace
-from dnc.execution.replay_engine import ReplayEngine
-from dnc.execution.decision_policy import RulePolicy, Decision as EPDecision
+from dnc.execution.execution_trace import (
+    DecisionRecord,
+    ExecutionRecord,
+    ExecutionTrace,
+    ModuleInvocationRecord,
+    ObservationRecord,
+    ResourceUsageRecord,
+    TerminationReason,
+)
 from dnc.distributed.protocol import DistributedHandoffConfig, DistributedHandoffMessage, HandoffMessageType
 from dnc.distributed.protocol import DistributedCoordinator, IdempotentReceiver
-from dnc.evaluation.computation_aware import ComputationMonitor, Level2Metrics
+from dnc.evaluation.computation_aware import ComputationMonitor
 from dnc.invariants.runtime_invariants import check_invariants
 from typing import cast
 
@@ -88,7 +90,7 @@ for idx, (x1, x2) in enumerate(XOR_INPUTS):
         math_correct = False
     print(f"  XOR({x1},{x2}) -> h1={h1:.4f}, h2={h2:.4f}, o={o:.4f}, result={result} [{status}]")
 
-print(f"  Expected: all 4 inputs match targets")
+print("  Expected: all 4 inputs match targets")
 score("XOR Math", 10 if math_correct else 3, "Verified sigmoid math independently" if math_correct else "Math mismatch")
 
 # Step 1b: Set up DNC runtime with XOR graph
@@ -135,9 +137,9 @@ es.G = sched
 runtime._current_graph = graph
 runtime._state = ExecutionState2.RUNNING
 
-print(f"  Modules registered: SRC, L1A, L1B, L2, DEC")
+print("  Modules registered: SRC, L1A, L1B, L2, DEC")
 print(f"  Graph: {len(graph.vertices)} vertices, {len(graph.edges)} edges")
-print(f"  Scheduler initialized with DAG")
+print("  Scheduler initialized with DAG")
 score("XOR Setup", 10, "Runtime, graph, scheduler all initialized correctly")
 
 # Step 1c: Create dispatch function with proper closure
@@ -173,8 +175,8 @@ def make_dispatch():
 
 dispatch_fn = make_dispatch()
 runtime.set_dispatch_fn(dispatch_fn)
-print(f"  Dispatch function created with sigmoid computation")
-print(f"  Provenance log initialized")
+print("  Dispatch function created with sigmoid computation")
+print("  Provenance log initialized")
 score("XOR Dispatch Fn", 10, "Sigmoid neuron computation correctly implemented")
 
 # Step 1d: Run full XOR through control loop
@@ -205,7 +207,7 @@ for idx, (x1, x2) in enumerate(XOR_INPUTS):
         all_correct = False
     print(f"  XOR({x1},{x2}): expected={XOR_TARGETS[idx]}, got={result} [{status}]")
 
-score("XOR Control Loop", 10 if all_correct else 0, f"All 4 inputs correct" if all_correct else f"Failed")
+score("XOR Control Loop", 10 if all_correct else 0, "All 4 inputs correct" if all_correct else "Failed")
 
 # Step 1e: Verify DNC == reference math (no drift)
 print()
@@ -284,7 +286,7 @@ for i in range(20):
     runtime.act(decision, es)
 
 print(f"  Provenance events recorded: {len(prov)}")
-print(f"  Expected minimum: 5 (SRC, L1A, L1B, L2, DEC)")
+print("  Expected minimum: 5 (SRC, L1A, L1B, L2, DEC)")
 
 chain_valid = prov.verify_chain()
 print(f"  Hash chain verified: {chain_valid}")
@@ -335,7 +337,6 @@ es2.w = wm2
 es2.m = registry2.snapshot()
 es2.g = sched2
 es2.c = CheckpointRecord()
-from dnc.state.working_memory import HistoryLog
 es2.h = HistoryLog()
 
 source_mod = SourceModule(source_type, ModuleContract(module_type_id=source_type), output_value=42)
@@ -447,15 +448,15 @@ for m in [d_src, d_xfrm1, d_xfrm2, d_sink]:
 
 runnable0 = sched3.get_runnable(wm3)
 print(f"  Initially runnable: {[str(m) for m in runnable0]}")
-print(f"  Correct: [SRC] with no upstreams should be runnable")
-print(f"  Note: nodes with no upstreams are always runnable (upstream check skipped)")
+print("  Correct: [SRC] with no upstreams should be runnable")
+print("  Note: nodes with no upstreams are always runnable (upstream check skipped)")
 
 initial_correct = d_src in runnable0 and len(runnable0) >= 1
 wm3[d_src] = Buffer.completed(None, 10)
 runnable1 = sched3.get_runnable(wm3)
 print(f"  After SRC completes: {[str(m) for m in runnable1]}")
-print(f"  XFRM1, XFRM2 now runnable (SRC complete)")
-print(f"  SRC still runnable (no upstreams) - runtime filters it out")
+print("  XFRM1, XFRM2 now runnable (SRC complete)")
+print("  SRC still runnable (no upstreams) - runtime filters it out")
 
 xfrms_correct = d_xfrm1 in runnable1 and d_xfrm2 in runnable1
 print(f"  Both transforms now runnable: {xfrms_correct}")
@@ -464,7 +465,7 @@ wm3[d_xfrm1] = Buffer.completed(None, 20)
 wm3[d_xfrm2] = Buffer.completed(None, 30)
 runnable2 = sched3.get_runnable(wm3)
 print(f"  After XFRM1+XFRM2 complete: {[str(m) for m in runnable2]}")
-print(f"  SINK now runnable (all upstreams complete)")
+print("  SINK now runnable (all upstreams complete)")
 
 sink_correct = d_sink in runnable2
 print(f"  Sink runnable: {sink_correct}")
@@ -472,8 +473,8 @@ print(f"  Sink runnable: {sink_correct}")
 wm3[d_sink] = Buffer.completed(None, 50)
 runnable3 = sched3.get_runnable(wm3)
 print(f"  After SINK completes: {[str(m) for m in runnable3]}")
-print(f"  Note: All nodes appear runnable (scheduler has no completion filter)")
-print(f"  Note: Runtime uses ACD-001 completion guard to filter completed nodes")
+print("  Note: All nodes appear runnable (scheduler has no completion filter)")
+print("  Note: Runtime uses ACD-001 completion guard to filter completed nodes")
 
 runnable_correct = initial_correct and xfrms_correct and sink_correct
 score("Scheduler Runnable", 10 if runnable_correct else 3, "Runnable detection works (runtime filters completed)" if runnable_correct else "Scheduler issue detected")
@@ -547,17 +548,17 @@ registry4.register(contract1)
 # Same contract registered twice is a no-op (idempotent per design)
 try:
     registry4.register(contract1)
-    print(f"  Same contract registered twice: idempotent (no error)")
+    print("  Same contract registered twice: idempotent (no error)")
     same_contract_ok = True
 except ValueError:
-    print(f"  Same contract registered twice: raised error")
+    print("  Same contract registered twice: raised error")
     same_contract_ok = False
 
 # Different version of same name raises
 try:
     contract2 = ModuleContract(module_type_id=ModuleTypeID("Test", "v2"), output_signature=int)
     registry4.register(contract2)
-    print(f"  Different version registered: NOT blocked")
+    print("  Different version registered: NOT blocked")
     diff_version_ok = False
 except ValueError as e:
     print(f"  Different version blocked correctly: {e}")
@@ -594,15 +595,6 @@ print("="*70)
 print()
 print("STEP 5a: Build and verify execution trace")
 print("-"*50)
-
-from dnc.execution.execution_trace import (
-    ObservationRecord,
-    DecisionRecord,
-    ModuleInvocationRecord,
-    ResourceUsageRecord,
-    ExecutionRecord,
-    TerminationReason,
-)
 
 trace = ExecutionTrace(execution_id="test-replay-001")
 print(f"  Trace initialized: {trace.execution_id}")
@@ -683,9 +675,8 @@ trace.finalize(TerminationReason.ALL_MODULES_COMPLETE, final_outcome=1)
 print(f"  Execution records: {len(trace.execution_record)}")
 print(f"  Is complete: {trace.is_complete}")
 print(f"  Termination reason: {trace.termination_reason}")
-print(f"  Serialization test: ", end="")
+print("  Serialization test: ", end="")
 try:
-    import json
     serialized = trace.to_dict()
     print(f"OK ({len(str(serialized))} chars)")
     score("Replay Trace Build", 10, "Trace builds and serializes correctly")
@@ -705,7 +696,6 @@ print()
 print("STEP 6a: Idempotent receiver deduplication")
 print("-"*50)
 
-from dnc.distributed.protocol import HandoffStatus
 
 receiver = IdempotentReceiver(window_size=5)
 message = DistributedHandoffMessage(

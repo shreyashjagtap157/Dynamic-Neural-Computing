@@ -24,8 +24,11 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = [".", "src"]
 addopts = "--strict-config --strict-markers"
+markers = [
+  "live_provider: opt-in live provider qualification requiring external services",
+]
 
 [tool.ruff]
 target-version = "py311"

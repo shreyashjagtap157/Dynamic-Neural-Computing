@@ -6,6 +6,7 @@ Implements canonical JSON / dict export and import for StructuralGraph.
 import json
 from dataclasses import asdict
 from typing import Dict, Any
+from dnc.kernel.versioning import schema_header
 from .graph import StructuralGraph, Edge, EdgeType
 from .identity import GraphID, GraphVersion, UnitID
 from .unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension, UnitContract, MutationContract, Constraint, EnforcementTier
@@ -17,6 +18,7 @@ class DNWIRSerializer:
     @staticmethod
     def to_dict(graph: StructuralGraph) -> Dict[str, Any]:
         data = {
+            **schema_header(),
             "graph_id": graph.graph_id.value,
             "version": {
                 "major": graph.version.major,
@@ -68,6 +70,8 @@ class DNWIRSerializer:
 
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> StructuralGraph:
+        # Version metadata was added after the original freeze. Older vectors
+        # without schema headers remain valid inputs for compatibility.
         g_id = GraphID(data["graph_id"])
         v_data = data.get("version", {})
         version = GraphVersion(

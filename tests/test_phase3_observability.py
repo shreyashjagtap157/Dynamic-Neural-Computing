@@ -4,7 +4,6 @@ Tests provenance model, failure taxonomy, evaluation suite, and continual learni
 """
 
 import sys
-import math
 sys.path.insert(0, 'src')
 
 from dnc.observability.provenance import (
@@ -12,41 +11,24 @@ from dnc.observability.provenance import (
     ProvenanceEvent,
     EventType,
     ProvenanceTamperingViolation,
-    CausalChainBroken,
 )
 from dnc.observability.failure import (
     FailureClassifier,
-    FailureHandler,
-    AlertManager,
-    FailureClassification,
     FailureSignal,
-    FailureRecord,
-    AlertSeverity,
     SIGNAL_TO_CLASSIFICATION,
 )
 from dnc.observability.evaluation import (
     EvaluationSuite,
     EvaluationScenario,
     EvaluationRun,
-    EvaluationStage,
     MetricResult,
     MetricClass,
     ResultClassification,
-    NovelTaskBenchmark,
-    get_canonical_novel_benchmarks,
 )
 from dnc.learning.continual import (
     KnowledgeBase,
-    LearningEvent,
     DriftChecker,
     ExecutionRecord,
-    LearningVerificationProtocol,
-    RollbackCircuitBreaker,
-    RootCauseRollback,
-    CandidateUpdate,
-    DriftBoundExceeded,
-    CatastrophicForgettingDetected,
-    ProvenanceTamperingViolation,
 )
 
 
@@ -273,7 +255,7 @@ class TestPhase3ExitCriteria:
 
         assert kb.kb_version == 3
 
-        prior_modules = dict(kb.KB_modules)
+        dict(kb.KB_modules)
         kb.rollback_to(1)
         assert kb.kb_version == 1
         assert "mod_v0" in kb.KB_modules

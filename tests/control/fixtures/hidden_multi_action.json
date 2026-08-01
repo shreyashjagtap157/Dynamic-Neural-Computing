@@ -1,0 +1,11 @@
+{
+  "fixture_id": "phase7-hidden-multi-action-v1",
+  "frozen": true,
+  "tasks": [
+    {"id": "easy", "expected": "STOP", "controller_correct": true, "baseline_correct": true, "controller_cost": 0.1, "baseline_cost": 0.3, "controller_risk": 0.05, "baseline_risk": 0.10},
+    {"id": "unknown", "expected": "RETRIEVE", "controller_correct": true, "baseline_correct": false, "controller_cost": 0.2, "baseline_cost": 0.3, "controller_risk": 0.08, "baseline_risk": 0.30},
+    {"id": "ambiguous", "expected": "ASK", "controller_correct": true, "baseline_correct": false, "controller_cost": 0.1, "baseline_cost": 0.3, "controller_risk": 0.04, "baseline_risk": 0.35},
+    {"id": "conflict", "expected": "VERIFY", "controller_correct": true, "baseline_correct": false, "controller_cost": 0.2, "baseline_cost": 0.3, "controller_risk": 0.07, "baseline_risk": 0.40},
+    {"id": "high-risk", "expected": "ESCALATE", "controller_correct": true, "baseline_correct": true, "controller_cost": 0.2, "baseline_cost": 0.3, "controller_risk": 0.03, "baseline_risk": 0.08}
+  ]
+}

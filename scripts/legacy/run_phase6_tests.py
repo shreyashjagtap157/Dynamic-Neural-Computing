@@ -43,11 +43,9 @@ def test_dccl_control_loop_integration():
     print("PASS: test_dccl_control_loop_integration")
 
 def test_dccl_interface_contracts():
-    from dnc.dcc.dcc_contracts import ComputationGeneratorInterface, StructuralControllerInterface, MutationProposal, AuthorizationDecision
+    from dnc.dcc.dcc_contracts import MutationProposal, AuthorizationDecision
     from dnc.dcc.dcc_generator import DeterministicComputationGenerator
     from dnc.dcc.dcc_controller import DeterministicStructuralController
-    from dnc.ir.operations import IROperation, OperationType
-    from dnc.ir.identity import UnitID
 
     # Test generator interface
     gen = DeterministicComputationGenerator()
