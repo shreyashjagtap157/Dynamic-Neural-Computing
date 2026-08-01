@@ -27,6 +27,9 @@ from dnc.kernel.versioning import (
     DNC_IR_SCHEMA_ID,
     DNC_IR_SCHEMA_VERSION,
     KERNEL_COMPATIBILITY_VERSION,
+    SUPPORTED_DNC_IR_SCHEMA_VERSIONS,
+    SchemaVersion,
+    validate_schema_header,
 )
 
 __all__ = [
@@ -52,4 +55,7 @@ __all__ = [
     "IDProvider",
     "KERNEL_COMPATIBILITY_VERSION",
     "RandomnessProvider",
+    "SchemaVersion",
+    "SUPPORTED_DNC_IR_SCHEMA_VERSIONS",
+    "validate_schema_header",
 ]

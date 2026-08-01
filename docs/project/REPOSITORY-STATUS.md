@@ -17,7 +17,7 @@ reference implementations unless their deployment profiles explicitly bind quali
 
 ## Current verified baseline
 
-- The authoritative pytest suite passes **399 tests**, with **2 intentional environment-dependent skips**.
+- The authoritative pytest suite passes **410 tests**, with **2 intentional environment-dependent skips**.
 - The Phase 12 canonical lifecycle audit passes **8/8**.
 - The Phase 13 benchmark harness integrity audit passes **3/3**.
 - Production source passes Ruff and Python byte-compilation.
@@ -56,6 +56,10 @@ Test success establishes the implemented behavior only. It does not establish em
     reporting, immutable artifacts, and explicit adverse/null-result handling.
 18. Added ordered offline/shadow/canary pilot governance, outcome and exercise evidence, operational
     readiness, independent fingerprint-bound approvals, rollback, and a fail-closed GA decision.
+19. Started Enterprise Roadmap M1 with a packaged, versioned Generic DNC-IR JSON Schema, strict
+    fail-closed schema/compatibility validation, and preserved headerless legacy deserialization.
+20. Corrected conformance-report output path handling so the checked-in relative CI command and
+    absolute external artifact paths both work.
 
 ## Known critical gaps
 

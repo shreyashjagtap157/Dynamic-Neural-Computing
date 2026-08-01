@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dnc:schema:dnc.ir.structural_graph:1.1.0",
+  "title": "DNC Generic Structural Graph",
+  "type": "object",
+  "required": [
+    "schema_id",
+    "schema_version",
+    "compatibility_version",
+    "graph_id",
+    "version",
+    "units",
+    "edges",
+    "metadata"
+  ],
+  "properties": {
+    "schema_id": {"const": "dnc.ir.structural_graph"},
+    "schema_version": {"const": "1.1.0"},
+    "compatibility_version": {"const": "2026.07.phase1"},
+    "graph_id": {"type": "string", "minLength": 1},
+    "version": {
+      "type": "object",
+      "required": ["major", "minor", "patch", "sequence"],
+      "properties": {
+        "major": {"type": "integer", "minimum": 0},
+        "minor": {"type": "integer", "minimum": 0},
+        "patch": {"type": "integer", "minimum": 0},
+        "sequence": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "units": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/unit"}
+    },
+    "edges": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/edge"}
+    },
+    "metadata": {"type": "object"}
+  },
+  "$defs": {
+    "unit": {
+      "type": "object",
+      "required": [
+        "unit_id", "name", "structure", "visibility", "lifecycle",
+        "contract", "mutation_contract", "constraints", "metadata", "sub_units"
+      ],
+      "properties": {
+        "unit_id": {"type": "string", "minLength": 1},
+        "name": {"type": "string"},
+        "structure": {"enum": ["PRIMITIVE", "COMPOSITE"]},
+        "visibility": {"enum": ["OPAQUE", "INSPECTABLE"]},
+        "lifecycle": {"enum": ["BASE", "SPECIALIZED"]},
+        "contract": {"type": "object"},
+        "mutation_contract": {"type": "object"},
+        "constraints": {"type": "array"},
+        "metadata": {"type": "object"},
+        "sub_units": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "edge": {
+      "type": "object",
+      "required": ["source", "target", "edge_type", "metadata"],
+      "properties": {
+        "source": {"type": "string", "minLength": 1},
+        "target": {"type": "string", "minLength": 1},
+        "edge_type": {"enum": ["DATA", "CONTROL", "STATE", "DEPENDENCY"]},
+        "metadata": {"type": "object"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

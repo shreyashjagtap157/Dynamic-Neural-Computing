@@ -38,6 +38,21 @@ CONF_DIR = TESTS_DIR / "conformance"
 CLAUDE_MD = REPO_ROOT / "CLAUDE.md"
 OUT_FILE = REPO_ROOT / "docs" / "conformance-report.md"
 
+
+def resolve_output_path(path: Path) -> Path:
+    """Resolve CLI output consistently against the repository root."""
+
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def display_output_path(path: Path) -> Path:
+    """Prefer a repository-relative display without rejecting external paths."""
+
+    try:
+        return path.relative_to(REPO_ROOT)
+    except ValueError:
+        return path
+
 # Invariant header patterns. Specs use two styles:
 #   **INV-CTRL-11 - Loop Termination Conditions**
 #   **INV-1 (Execution Header Immutability):**
@@ -379,9 +394,10 @@ def main() -> int:
 
     report = render(invariants, cov, conf_pass, conf_total, conf_rows, acd_res, acd_tot, spec_ok)
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(report, encoding="utf-8")
-    print(f"Wrote {args.out.relative_to(REPO_ROOT)}")
+    output_path = resolve_output_path(args.out)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(report, encoding="utf-8")
+    print(f"Wrote {display_output_path(output_path)}")
 
     fully = (
         conf_total > 0

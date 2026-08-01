@@ -7,6 +7,7 @@ import json
 from dataclasses import asdict
 from typing import Dict, Any
 from dnc.kernel.versioning import schema_header
+from dnc.ir.schema import validate_ir_document
 from .graph import StructuralGraph, Edge, EdgeType
 from .identity import GraphID, GraphVersion, UnitID
 from .unit import ComputationalUnit, StructureDimension, VisibilityDimension, LifecycleDimension, UnitContract, MutationContract, Constraint, EnforcementTier
@@ -72,6 +73,7 @@ class DNWIRSerializer:
     def from_dict(data: Dict[str, Any]) -> StructuralGraph:
         # Version metadata was added after the original freeze. Older vectors
         # without schema headers remain valid inputs for compatibility.
+        validate_ir_document(data)
         g_id = GraphID(data["graph_id"])
         v_data = data.get("version", {})
         version = GraphVersion(

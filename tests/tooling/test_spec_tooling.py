@@ -2,6 +2,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tools.generate_conformance_report import (
+    REPO_ROOT,
+    display_output_path,
+    resolve_output_path,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -23,3 +29,13 @@ def test_specification_references_are_valid() -> None:
 def test_invariant_declarations_use_rfc2119_capitalization() -> None:
     result = _run("--rfc2119")
     assert result.returncode == 0, result.stderr
+
+
+def test_conformance_output_paths_support_ci_relative_and_external_targets(tmp_path) -> None:
+    relative = resolve_output_path(Path("conformance-report-ci.md"))
+    external = tmp_path / "report.md"
+
+    assert relative == REPO_ROOT / "conformance-report-ci.md"
+    assert display_output_path(relative) == Path("conformance-report-ci.md")
+    assert resolve_output_path(external) == external
+    assert display_output_path(external) == external
