@@ -21,6 +21,8 @@ from dnc.capabilities.registry import CapabilityRegistry
 from dnc.cognition.migration import export_cognitive_state, import_cognitive_state
 from dnc.cognition.contracts import ConfidenceEstimate
 from dnc.cognition.state import CognitiveState
+from dnc.control.contracts import ControllerContext, ControllerDecision
+from dnc.control.controller import SemanticCognitiveController
 from dnc.dcc.assessment_engine import Assessment, AssessmentEngine, ExecutionResult
 from dnc.dcc.computation_generator import (
     ComputationGenerator,
@@ -37,6 +39,11 @@ from dnc.ir.identity import GraphID
 from dnc.ir.validator import DNCIRValidator
 from dnc.halting.contracts import HaltingContext, InferenceDecision
 from dnc.halting.policy import AdaptiveHaltingPolicy
+from dnc.semantics.contracts import SemanticGraphCandidate
+from dnc.semantics.synthesis import SemanticSynthesizer, SynthesisRequest
+from dnc.semantics.validation import SemanticValidation, validate_semantic_candidate
+from dnc.repair.contracts import RepairOutcome
+from dnc.repair.engine import execute_localized_repair
 from dnc.mutation.engine import MutationEngine
 from dnc.observability.provenance import ProvenanceLog
 from dnc.projection.projector import StructuralProjector
@@ -117,6 +124,7 @@ class DNCSystem:
         outcome_labels: Optional[OutcomeLabelStore] = None,
         risk_policies: Optional[RiskPolicyRegistry] = None,
         inference_policy: Optional[AdaptiveHaltingPolicy] = None,
+        semantic_controller: Optional[SemanticCognitiveController] = None,
     ) -> None:
         self.execution_id = execution_id
         self.config = config or DNCSystemConfig()
@@ -155,6 +163,7 @@ class DNCSystem:
         self.outcome_labels = outcome_labels or OutcomeLabelStore()
         self.risk_policies = risk_policies or RiskPolicyRegistry()
         self.inference_policy = inference_policy
+        self.semantic_controller = semantic_controller or SemanticCognitiveController()
         self.assessment_engine = AssessmentEngine()
         self.generator = ComputationGenerator()
         self.controller = StructuralController()
@@ -299,6 +308,83 @@ class DNCSystem:
         if self.config.enable_adaptive_halting:
             return self.inference_policy.decide(context)
         return self.inference_policy.fallback.decide(context)
+
+    def select_cognitive_action(
+        self, context: ControllerContext, *, authorize_lifecycle: bool = True
+    ) -> ControllerDecision:
+        """Select and optionally lifecycle-authorize one Phase 7 cognitive action."""
+
+        if self.cognitive_state is not None and context.task_id != self.cognitive_state.task.task_id:
+            raise ValueError("controller context MUST belong to the active cognitive task")
+        decision = self.semantic_controller.select(context)
+        if authorize_lifecycle and decision.selected is not None:
+            if self.cognitive_state is None:
+                raise ValueError("lifecycle authorization requires active cognitive state")
+            self.cognitive_state = self.semantic_controller.authorize_lifecycle(
+                self.cognitive_state, decision
+            )
+        return decision
+
+    def synthesize_semantic_graph(
+        self, request: SynthesisRequest
+    ) -> tuple[SemanticGraphCandidate, ...]:
+        """Generate Phase 8 semantic DNC-IR candidates without mutating the graph."""
+
+        if self.cognitive_state is None or request.state != self.cognitive_state:
+            raise ValueError("synthesis request MUST use the active cognitive state")
+        candidates = SemanticSynthesizer(self.capability_registry).synthesize(request)
+        return tuple(
+            candidate
+            for candidate in candidates
+            if all(unit.unit_id.value not in self.graph.units for unit in candidate.units)
+        )
+
+    def apply_semantic_candidate(
+        self,
+        candidate: SemanticGraphCandidate,
+        *,
+        available_budget: float,
+        granted_permissions: frozenset[str],
+        available_isolation_grade: str,
+    ) -> tuple[bool, SemanticValidation]:
+        """Validate and transactionally commit one semantic graph candidate."""
+
+        if self.cognitive_state is None:
+            raise ValueError("semantic candidate application requires cognitive state")
+        existing_units = tuple(
+            unit.unit_id.value
+            for unit in candidate.units
+            if unit.unit_id.value in self.graph.units
+        )
+        if existing_units:
+            return False, SemanticValidation(
+                False,
+                tuple(f"SEMANTIC_TRANSPOSITION:{unit_id}" for unit_id in existing_units),
+            )
+        validation = validate_semantic_candidate(
+            candidate,
+            self.capability_registry,
+            task_id=self.cognitive_state.task.task_id,
+            tenant_id=self.cognitive_state.task.tenant_id,
+            available_budget=available_budget,
+            granted_permissions=granted_permissions,
+            available_isolation_grade=available_isolation_grade,
+        )
+        if not validation.valid:
+            return False, validation
+        committed, _ = self.transaction_manager.execute_transaction(
+            self.graph, list(candidate.operations), base_version=self.graph.version
+        )
+        if committed:
+            self._transaction_commits += 1
+        else:
+            self._transaction_rollbacks += 1
+        return committed, validation
+
+    def repair_cognitive_state(self, root_item_id, recompute, verify) -> RepairOutcome:
+        """Run Phase 9 localized repair within a snapshot rollback boundary."""
+
+        return execute_localized_repair(self, root_item_id, recompute, verify)
 
     def restore_execution_snapshot(self, snapshot: Snapshot) -> None:
         """Atomically restore integrated process-local state from a snapshot."""

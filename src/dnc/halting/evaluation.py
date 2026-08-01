@@ -52,13 +52,37 @@ def evaluate_trials(trials: tuple[HaltingTrial, ...], *, seed: int = 0) -> Halti
 
 
 def compare_matched_quality(
-    adaptive: tuple[HaltingTrial, ...], baseline: tuple[HaltingTrial, ...], *, tolerance: float = 0.0
-) -> dict[str, float | bool]:
+    adaptive: tuple[HaltingTrial, ...],
+    baseline: tuple[HaltingTrial, ...],
+    *,
+    tolerance: float = 0.0,
+    maximum_critical_false_stop_increase: float = 0.0,
+    seed: int = 0,
+) -> dict[str, float | bool | tuple[float, float]]:
+    adaptive_by_task = {trial.task_id: trial for trial in adaptive}
+    baseline_by_task = {trial.task_id: trial for trial in baseline}
+    if len(adaptive_by_task) != len(adaptive) or len(baseline_by_task) != len(baseline):
+        raise ValueError("halting comparisons require unique task IDs")
+    if set(adaptive_by_task) != set(baseline_by_task):
+        raise ValueError("halting comparisons require paired task IDs")
     adaptive_result, baseline_result = evaluate_trials(adaptive), evaluate_trials(baseline)
+    paired_attempt_savings = [
+        baseline_by_task[task_id].attempts - adaptive_by_task[task_id].attempts
+        for task_id in sorted(adaptive_by_task)
+    ]
+    false_stop_delta = (
+        adaptive_result.critical_false_stop_rate - baseline_result.critical_false_stop_rate
+    )
     return {
         "quality_matched": adaptive_result.accuracy + tolerance >= baseline_result.accuracy,
         "attempt_reduction": baseline_result.average_attempts - adaptive_result.average_attempts,
+        "attempt_reduction_interval": bootstrap_interval(
+            paired_attempt_savings, samples=1000, seed=seed
+        ),
         "token_reduction": baseline_result.average_tokens - adaptive_result.average_tokens,
         "latency_reduction_ms": baseline_result.average_latency_ms - adaptive_result.average_latency_ms,
-        "critical_false_stop_delta": adaptive_result.critical_false_stop_rate - baseline_result.critical_false_stop_rate,
+        "critical_false_stop_delta": false_stop_delta,
+        "critical_false_stop_acceptable": (
+            false_stop_delta <= maximum_critical_false_stop_increase
+        ),
     }

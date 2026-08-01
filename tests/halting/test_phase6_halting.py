@@ -117,7 +117,7 @@ def test_budget_and_tail_exhaustion_abstain_without_claiming_correctness() -> No
 
 def test_correlated_agreement_does_not_satisfy_independence_gate() -> None:
     context = _context(attempts=(_attempt("a", group="same"), _attempt("b", group="same")))
-    assert _adaptive().decide(context).action is InferenceAction.SAMPLE
+    assert _adaptive().decide(context).action is InferenceAction.DIVERSIFY
 
 
 def test_fixed_baselines_and_opt_in_system_gate_remain_available() -> None:
@@ -138,6 +138,17 @@ def test_fixed_baselines_and_opt_in_system_gate_remain_available() -> None:
         DNCSystem().decide_inference(context)
 
 
+def test_fixed_baselines_abstain_when_safe_stop_checks_fail() -> None:
+    unsafe = _context(
+        attempts=(_attempt("a"), _attempt("b"), _attempt("c")),
+        mandatory_checks_passed=False,
+        confidence=None,
+    )
+    assert FixedAttemptPolicy(3).decide(unsafe).action is InferenceAction.ABSTAIN
+    assert FixedRefinementPolicy(2).decide(unsafe).action is InferenceAction.ABSTAIN
+    assert SelfConsistencyPolicy(3).decide(unsafe).action is InferenceAction.ABSTAIN
+
+
 def test_matched_quality_evaluation_reports_savings_and_false_stops() -> None:
     baseline = tuple(
         HaltingTrial(f"task-{index}", "fixed", True, True, index == 3, 3, 300, 0.3, 300)
@@ -151,5 +162,14 @@ def test_matched_quality_evaluation_reports_savings_and_false_stops() -> None:
     evaluation = evaluate_trials(adaptive, seed=9)
     assert comparison["quality_matched"]
     assert comparison["attempt_reduction"] == 1
+    assert comparison["attempt_reduction_interval"] == (1.0, 1.0)
     assert comparison["critical_false_stop_delta"] == 0
+    assert comparison["critical_false_stop_acceptable"]
     assert evaluation.attempt_savings_interval == (2.0, 2.0)
+
+
+def test_evaluation_rejects_unpaired_trials() -> None:
+    adaptive = (HaltingTrial("a", "adaptive", True, True, False, 1, 10, 0.1, 10),)
+    baseline = (HaltingTrial("b", "fixed", True, True, False, 2, 20, 0.2, 20),)
+    with pytest.raises(ValueError, match="paired"):
+        compare_matched_quality(adaptive, baseline)

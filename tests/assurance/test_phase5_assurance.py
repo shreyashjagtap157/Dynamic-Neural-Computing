@@ -43,7 +43,8 @@ from dnc.cognition import EpistemicItem, EpistemicRelation, EpistemicStatus, Rel
 from dnc.capabilities import CapabilityCard, CapabilityRegistry, CapabilityRequirement
 from dnc.cognition import CognitiveActionType, CognitiveState, GoalInvariant, PolicyContext, TaskSpec
 from dnc.kernel.errors import DNCCalibrationError, DNCPolicyError, DNCVerificationError
-from dnc.system import DNCSystem
+from dnc.halting import AdaptiveHaltingPolicy, AttemptRecord, HaltingContext, InferenceAction, InferenceBudget
+from dnc.system import DNCSystem, DNCSystemConfig
 
 
 def _descriptor(
@@ -326,7 +327,7 @@ def test_frozen_held_out_fixture_meets_declared_reference_risk_coverage_targets(
     assert half_coverage_risk <= acceptance["maximum_risk_at_half_coverage"]
 
 
-def test_phases1_to5_operate_as_one_governed_system() -> None:
+def test_phases1_to6_operate_as_one_governed_system() -> None:
     capabilities = CapabilityRegistry()
     card = CapabilityCard(
         "model", "Model", "provider", "1", "model-v1",
@@ -353,10 +354,18 @@ def test_phases1_to5_operate_as_one_governed_system() -> None:
     )
     system = DNCSystem(
         execution_id="phase1-5-manual",
+        config=DNCSystemConfig(enable_adaptive_halting=True),
         cognitive_state=cognitive_state,
         capability_registry=capabilities,
         verifier_registry=verifiers,
         assurance_calibrations=calibrations,
+        inference_policy=AdaptiveHaltingPolicy(
+            RiskThresholdPolicy(
+                "phase6", "1", "general", {risk: 0.5 for risk in RiskClass},
+                "reviewer", "approval-phase6",
+            ),
+            enabled=True,
+        ),
     )
     graph_identity = system.graph.graph_id
     snapshot = system.capture_execution_snapshot("phase1-5-snapshot")
@@ -375,6 +384,29 @@ def test_phases1_to5_operate_as_one_governed_system() -> None:
         semantic_cluster_count=2, correlation_groups=("model", "exact-tool"),
     )
     assert confidence.applicability_status == "calibrated"
+    attempts = tuple(
+        AttemptRecord(
+            attempt_id,
+            "task",
+            "verified answer",
+            ("answer is verified",),
+            f"model-{attempt_id}",
+            f"prompt-{attempt_id}",
+            f"seed-{attempt_id}",
+            verifier_result_ids=(verification.results[0].result_id,),
+        )
+        for attempt_id in ("a", "b")
+    )
+    halt = system.decide_inference(
+        HaltingContext(
+            "task", "general", RiskClass.HIGH, attempts,
+            InferenceBudget(3, 1000, 1, 1000), True, True,
+            confidence=confidence,
+            expected_action_values={InferenceAction.SAMPLE: 0.01},
+            action_costs={InferenceAction.SAMPLE: 0.02},
+        )
+    )
+    assert halt.action is InferenceAction.STOP
 
     verifiers.disable("verifier-1")
     with pytest.raises(DNCCalibrationError, match="verifier fingerprints"):

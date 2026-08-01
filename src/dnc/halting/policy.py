@@ -44,7 +44,10 @@ class FixedAttemptPolicy:
 
     def decide(self, context: HaltingContext) -> InferenceDecision:
         status = budget_status(context)
-        action = InferenceAction.STOP if len(context.attempts) >= self.attempts else InferenceAction.SAMPLE
+        if len(context.attempts) >= self.attempts:
+            action = InferenceAction.STOP if _minimum_stop_checks(context) else InferenceAction.ABSTAIN
+        else:
+            action = InferenceAction.SAMPLE
         if status.exhausted and action is not InferenceAction.STOP:
             action = InferenceAction.ABSTAIN
         return InferenceDecision(action, ("FIXED_ATTEMPT_BASELINE",), status, policy_mode=HaltingPolicyMode.FIXED_ATTEMPT)
@@ -59,7 +62,14 @@ class FixedRefinementPolicy:
         if status.exhausted and len(context.attempts) <= self.refinements:
             action = InferenceAction.ABSTAIN
         else:
-            action = InferenceAction.STOP if len(context.attempts) > self.refinements else InferenceAction.SAMPLE
+            if len(context.attempts) > self.refinements:
+                action = (
+                    InferenceAction.STOP
+                    if _minimum_stop_checks(context)
+                    else InferenceAction.ABSTAIN
+                )
+            else:
+                action = InferenceAction.SAMPLE
         return InferenceDecision(action, ("FIXED_REFINEMENT_BASELINE",), status, policy_mode=HaltingPolicyMode.FIXED_REFINEMENT)
 
 
@@ -74,7 +84,11 @@ class SelfConsistencyPolicy:
         total = sum(cluster.independent_weight for cluster in clusters)
         fraction = clusters[0].independent_weight / total if total else 0.0
         if len(context.attempts) >= self.attempts:
-            action = InferenceAction.STOP if fraction >= self.minimum_leading_fraction else InferenceAction.ABSTAIN
+            action = (
+                InferenceAction.STOP
+                if fraction >= self.minimum_leading_fraction and _minimum_stop_checks(context)
+                else InferenceAction.ABSTAIN
+            )
         else:
             action = InferenceAction.ABSTAIN if status.exhausted else InferenceAction.SAMPLE
         return InferenceDecision(
@@ -127,6 +141,21 @@ class AdaptiveHaltingPolicy:
             and fraction >= self.minimum_leading_fraction
             and independent_groups >= self.minimum_independent_groups
         )
+        if (
+            lead is not None
+            and independent_groups < self.minimum_independent_groups
+            and InferenceAction.DIVERSIFY in context.available_actions
+        ):
+            return InferenceDecision(
+                InferenceAction.DIVERSIFY,
+                ("INDEPENDENCE_INSUFFICIENT",),
+                status,
+                threshold,
+                lower_bound,
+                len(clusters),
+                fraction,
+                alternatives,
+            )
         next_action, marginal_value, next_cost = self._best_next_action(context)
         may_stop = (
             context.mandatory_checks_passed
@@ -194,3 +223,14 @@ class AdaptiveHaltingPolicy:
             leading_cluster_weight=fraction,
             alternatives=alternatives,
         )
+
+
+def _minimum_stop_checks(context: HaltingContext) -> bool:
+    return (
+        context.mandatory_checks_passed
+        and context.output_contract_satisfied
+        and not context.critical_contradictions
+        and not context.missing_information
+        and context.confidence is not None
+        and context.confidence.applicability_status == "calibrated"
+    )

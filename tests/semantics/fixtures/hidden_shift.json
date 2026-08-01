@@ -1,0 +1,9 @@
+{
+  "fixture_id": "phase8-hidden-shift-v1",
+  "frozen": true,
+  "tasks": [
+    {"id": "unknown-source", "expected_action": "RETRIEVE"},
+    {"id": "competing-hypotheses", "expected_action": "OBSERVE_OR_TEST"},
+    {"id": "unknown-and-hypotheses", "expected_action": "RETRIEVE"}
+  ]
+}

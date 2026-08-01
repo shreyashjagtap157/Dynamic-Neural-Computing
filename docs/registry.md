@@ -91,3 +91,6 @@ These documents are draft governance extensions for the expanded DNC intent. The
 | PHASE3-COGNITION | Canonical cognitive contracts, epistemic state, schema hashing, import/export, and invalidation | Draft | C |
 | PHASE4-CAPABILITIES | Capability registry, auditable broker, provider-neutral adapters, resilience, and backend cards | Draft | C |
 | PHASE5-ASSURANCE | Scoped verifiers, delayed outcomes, calibration artifacts, semantic agreement, shift, and risk policy | Draft | C |
+| PHASE6-HALTING | Attempt records, safe adaptive inference halting, budgets, baselines, and paired evaluation | Draft | C |
+| PHASE7-CONTROL | Authorization-first semantic candidates, Pareto selection, lifecycle, alternatives, and shadow logging | Draft | C |
+| PHASE8-SEMANTICS | Capability-bound semantic DNC-IR synthesis, active inquiry, causal validity, and outcome comparison | Draft | C |
