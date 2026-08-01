@@ -96,9 +96,14 @@ def execute_localized_repair(
             view_id for view_id in original.invalidated_views
             if view_id not in cut.affected_ids
         )
+        invalidated_revisions = tuple(
+            replace(original_by_id[item_id], invalidation_status=InvalidationStatus.INVALID)
+            for item_id in affected_claim_ids
+        )
         system.cognitive_state = replace(
             original,
             epistemic_items=repaired_items,
+            epistemic_history=original.epistemic_history + invalidated_revisions,
             invalidated_views=repaired_views,
             event_log=original.event_log + ({"event": "localized_repair", "root": root_item_id, "affected": cut.affected_ids},),
         )

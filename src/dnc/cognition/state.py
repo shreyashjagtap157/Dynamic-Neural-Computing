@@ -124,6 +124,7 @@ class CognitiveState:
     task: TaskSpec
     schema_version: str = COGNITIVE_SCHEMA_VERSION
     epistemic_items: tuple[EpistemicItem, ...] = ()
+    epistemic_history: tuple[EpistemicItem, ...] = ()
     evidence: tuple[EvidenceItem | EvidenceRef, ...] = ()
     relations: tuple[EpistemicRelation, ...] = ()
     hypotheses: tuple[Hypothesis, ...] = ()
@@ -143,6 +144,9 @@ class CognitiveState:
         for item in self.epistemic_items:
             if item.tenant_id != self.task.tenant_id:
                 raise ValueError("epistemic item tenant_id MUST match task tenant_id")
+        for item in self.epistemic_history:
+            if item.tenant_id != self.task.tenant_id:
+                raise ValueError("epistemic history tenant_id MUST match task tenant_id")
         for evidence in self.evidence:
             if getattr(evidence, "tenant_id", self.task.tenant_id) != self.task.tenant_id:
                 raise ValueError("evidence tenant_id MUST match task tenant_id")
@@ -210,6 +214,7 @@ class CognitiveState:
         return CognitiveState(
             task=self.task,
             epistemic_items=self.epistemic_items + (item,),
+            epistemic_history=self.epistemic_history,
             evidence=self.evidence,
             relations=self.relations,
             hypotheses=self.hypotheses,
@@ -239,6 +244,7 @@ class CognitiveState:
         return CognitiveState(
             task=self.task,
             epistemic_items=self.epistemic_items,
+            epistemic_history=self.epistemic_history,
             evidence=self.evidence + (evidence,),
             relations=self.relations,
             hypotheses=self.hypotheses,

@@ -164,6 +164,7 @@ COGNITIVE_STATE_SCHEMA: dict[str, Any] = {
         "schema_version": {"const": COGNITIVE_SCHEMA_VERSION},
         "task": TASK_SPEC_SCHEMA,
         "epistemic_items": {"type": "array", "items": EPISTEMIC_ITEM_SCHEMA},
+        "epistemic_history": {"type": "array", "items": EPISTEMIC_ITEM_SCHEMA},
         "evidence": {"type": "array"},
         "event_log": {"type": "array"},
     },

@@ -1,4 +1,6 @@
 from dataclasses import replace
+import json
+from pathlib import Path
 
 import pytest
 
@@ -10,6 +12,8 @@ from dnc.cognition import (
     PolicyContext,
     RiskClass,
     TaskSpec,
+    export_cognitive_state,
+    import_cognitive_state,
 )
 from dnc.ir.serialization import DNWIRSerializer
 from dnc.repair import (
@@ -116,6 +120,14 @@ def test_localized_repair_matches_full_recompute_and_preserves_independent_state
     assert evaluation.repair_precision == 1
     assert evaluation.unaffected_preservation == 1
     assert evaluation.avoided_recomputation_fraction == pytest.approx(1 / 3)
+    history = system.cognitive_state.epistemic_history
+    assert [(item.item_id, item.content) for item in history] == [
+        ("root", "old root"),
+        ("child", "old child"),
+    ]
+    assert all(item.invalidation_status.value == "INVALID" for item in history)
+    restored = import_cognitive_state(export_cognitive_state(system.cognitive_state))
+    assert restored.epistemic_history == history
 
 
 def test_failed_reverification_rolls_back_everything() -> None:
@@ -144,6 +156,21 @@ def test_adversarial_cross_tenant_recompute_is_rejected_and_rolled_back() -> Non
     assert not outcome.success
     assert system.cognitive_state.canonical_hash() == before
     assert any("tenant" in reason for reason in outcome.reason_codes)
+
+
+def test_frozen_stale_evidence_fixture_repairs_only_dependency_cut() -> None:
+    fixture = json.loads(
+        (Path(__file__).parent / "fixtures" / "stale_evidence.json").read_text(encoding="utf-8")
+    )
+    system = DNCSystem(cognitive_state=_state())
+    outcome = system.repair_cognitive_state(
+        fixture["root_id"],
+        lambda item: replace(item, content=f"{fixture['replacement_prefix']} {item.item_id}"),
+        lambda item: item.content.startswith(fixture["replacement_prefix"]),
+    )
+    assert outcome.success
+    assert set(outcome.affected_ids) == set(fixture["affected_ids"])
+    assert set(outcome.preserved_ids) == set(fixture["preserved_ids"])
 
 
 @pytest.mark.parametrize(

@@ -1,0 +1,6 @@
+{
+  "root_id": "root",
+  "replacement_prefix": "corrected",
+  "affected_ids": ["root", "child", "answer"],
+  "preserved_ids": ["independent"]
+}

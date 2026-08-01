@@ -50,6 +50,9 @@ def import_cognitive_state(payload: str | dict[str, Any]) -> CognitiveState:
 
     task = _task_from_dict(raw["task"])
     epistemic_items = tuple(_epistemic_item_from_dict(item) for item in raw.get("epistemic_items", ()))
+    epistemic_history = tuple(
+        _epistemic_item_from_dict(item) for item in raw.get("epistemic_history", ())
+    )
     evidence = tuple(_evidence_from_dict(item) for item in raw.get("evidence", ()))
     relations = tuple(_relation_from_dict(item) for item in raw.get("relations", ()))
     hypotheses = tuple(_hypothesis_from_dict(item) for item in raw.get("hypotheses", ()))
@@ -65,6 +68,7 @@ def import_cognitive_state(payload: str | dict[str, Any]) -> CognitiveState:
         task=task,
         schema_version=raw.get("schema_version", COGNITIVE_SCHEMA_VERSION),
         epistemic_items=epistemic_items,
+        epistemic_history=epistemic_history,
         evidence=evidence,
         relations=relations,
         hypotheses=hypotheses,
@@ -224,6 +228,10 @@ def redacted_export(state: CognitiveState, allowed_labels: set[str]) -> str:
     visible_item_ids = {
         item.item_id for item in state.epistemic_items if set(item.security_labels) <= allowed_labels
     }
+    visible_history = tuple(
+        item for item in state.epistemic_history
+        if set(item.security_labels) <= allowed_labels
+    )
     visible_evidence_ids = {
         item.evidence_id
         for item in state.evidence
@@ -256,6 +264,7 @@ def redacted_export(state: CognitiveState, allowed_labels: set[str]) -> str:
         epistemic_items=tuple(
             item for item in state.epistemic_items if item.item_id in visible_item_ids
         ),
+        epistemic_history=visible_history,
         evidence=tuple(item for item in state.evidence if item.evidence_id in visible_evidence_ids),
         relations=tuple(
             relation for relation in state.relations

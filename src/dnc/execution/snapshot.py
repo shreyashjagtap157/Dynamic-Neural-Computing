@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable
 
+from dnc.cognition.canonical import canonical_data
 from dnc.execution.execution_provider import ExecutionCapability, ExecutionProvider, ProviderResult
 from dnc.kernel.errors import DNCCancellationError, DNCCleanupError, DNCExecutionError
 from dnc.ir.graph import StructuralGraph
@@ -599,4 +600,4 @@ def _hash_text(value: str) -> str:
 
 
 def _hash_json(value: Any) -> str:
-    return _hash_text(json.dumps(value, sort_keys=True, separators=(",", ":")))
+    return _hash_text(json.dumps(canonical_data(value), sort_keys=True, separators=(",", ":")))

@@ -19,7 +19,7 @@ from dnc.capabilities.broker import CapabilityBroker
 from dnc.capabilities.contracts import CapabilityRequirement, CapabilitySelection
 from dnc.capabilities.registry import CapabilityRegistry
 from dnc.cognition.migration import export_cognitive_state, import_cognitive_state
-from dnc.cognition.contracts import ConfidenceEstimate
+from dnc.cognition.contracts import ConfidenceEstimate, RiskClass
 from dnc.cognition.state import CognitiveState
 from dnc.control.contracts import ControllerContext, ControllerDecision
 from dnc.control.controller import SemanticCognitiveController
@@ -39,12 +39,18 @@ from dnc.ir.identity import GraphID
 from dnc.ir.validator import DNCIRValidator
 from dnc.halting.contracts import HaltingContext, InferenceDecision
 from dnc.halting.policy import AdaptiveHaltingPolicy
+from dnc.memory import GovernedMemory, MemoryKind, SkillRegistry
+from dnc.policy_learning import (
+    LearnedPolicyRegistry, LearnedPolicyVersion, PolicyDecision,
+    TabularShadowPredictor, select_action,
+)
 from dnc.semantics.contracts import SemanticGraphCandidate
 from dnc.semantics.synthesis import SemanticSynthesizer, SynthesisRequest
 from dnc.semantics.validation import SemanticValidation, validate_semantic_candidate
 from dnc.repair.contracts import RepairOutcome
 from dnc.repair.engine import execute_localized_repair
 from dnc.mutation.engine import MutationEngine
+from dnc.neural import AdaptiveDepthModel, AdaptiveDepthResult, NeuralExitEvidence, issue_exit_evidence
 from dnc.observability.provenance import ProvenanceLog
 from dnc.projection.projector import StructuralProjector
 from dnc.transaction.manager import TransactionManager
@@ -125,6 +131,9 @@ class DNCSystem:
         risk_policies: Optional[RiskPolicyRegistry] = None,
         inference_policy: Optional[AdaptiveHaltingPolicy] = None,
         semantic_controller: Optional[SemanticCognitiveController] = None,
+        governed_memory: Optional[GovernedMemory] = None,
+        skill_registry: Optional[SkillRegistry] = None,
+        learned_policy_registry: Optional[LearnedPolicyRegistry] = None,
     ) -> None:
         self.execution_id = execution_id
         self.config = config or DNCSystemConfig()
@@ -164,6 +173,9 @@ class DNCSystem:
         self.risk_policies = risk_policies or RiskPolicyRegistry()
         self.inference_policy = inference_policy
         self.semantic_controller = semantic_controller or SemanticCognitiveController()
+        self.governed_memory = governed_memory or GovernedMemory()
+        self.skill_registry = skill_registry or SkillRegistry()
+        self.learned_policy_registry = learned_policy_registry or LearnedPolicyRegistry()
         self.assessment_engine = AssessmentEngine()
         self.generator = ComputationGenerator()
         self.controller = StructuralController()
@@ -216,6 +228,9 @@ class DNCSystem:
                     else None
                 ),
                 "capability_registry": self.capability_registry.snapshot_state(),
+                "governed_memory": self.governed_memory.snapshot(),
+                "skill_registry": self.skill_registry.snapshot(),
+                "learned_policy_registry": self.learned_policy_registry.snapshot(),
                 "cycle_count": self._cycle_count,
                 "proposals_generated": self._proposals_generated,
                 "proposals_authorized": self._proposals_authorized,
@@ -386,6 +401,80 @@ class DNCSystem:
 
         return execute_localized_repair(self, root_item_id, recompute, verify)
 
+    def retrieve_memory(self, kind: MemoryKind, **criteria):
+        """Retrieve Phase 10 memory through tenant, freshness, and trust policy."""
+
+        return self.governed_memory.store(kind).retrieve(**criteria)
+
+    def select_learned_action(
+        self,
+        *,
+        policy: LearnedPolicyVersion,
+        predictor: TabularShadowPredictor,
+        risk_class: RiskClass,
+        context_key: str,
+        candidate_ids: tuple[str, ...],
+        deterministic_action_id: str,
+        safe_action_ids: frozenset[str],
+        exploration_index: int = 0,
+    ) -> PolicyDecision:
+        """Use Phase 11 policy only when its independent low-risk gate permits it."""
+
+        return select_action(
+            policy=policy,
+            predictor=predictor,
+            context_key=context_key,
+            candidate_ids=candidate_ids,
+            deterministic_action_id=deterministic_action_id,
+            safe_action_ids=safe_action_ids,
+            canary_allowed=self.learned_policy_registry.can_execute(
+                policy.fingerprint, risk_class
+            ),
+            exploration_index=exploration_index,
+        )
+
+    def execute_adaptive_neural(
+        self,
+        *,
+        capability_id: str,
+        model: AdaptiveDepthModel,
+        value,
+        task_id: str,
+        domain: str,
+        risk_class: RiskClass,
+        force_full_depth: bool = False,
+    ) -> tuple[AdaptiveDepthResult, NeuralExitEvidence]:
+        """Execute Phase 12 adaptive depth through an active model-matched capability."""
+
+        available = {card.capability_id: card for card in self.capability_registry.available()}
+        card = available.get(capability_id)
+        if card is None:
+            raise DNCCapabilityError("adaptive neural capability is unavailable")
+        if card.model_id != model.model_fingerprint:
+            raise DNCCapabilityError("adaptive neural capability model fingerprint mismatch")
+        if not card.metadata.get("adaptive_neural", False):
+            raise DNCCapabilityError("capability is not qualified for adaptive neural execution")
+        risk_rank = {
+            RiskClass.LOW: 0, RiskClass.MEDIUM: 1, RiskClass.HIGH: 2, RiskClass.CRITICAL: 3
+        }
+        if risk_rank[risk_class] > risk_rank[card.risk_limit]:
+            raise DNCCapabilityError("adaptive neural capability risk limit exceeded")
+        if domain not in card.calibration_domains:
+            raise DNCCalibrationError("adaptive neural capability is not calibrated for domain")
+        result = model.execute(
+            value,
+            domain=domain,
+            risk_class=risk_class,
+            force_full_depth=force_full_depth,
+        )
+        evidence = issue_exit_evidence(
+            result,
+            capability_id=capability_id,
+            model_fingerprint=model.model_fingerprint,
+            task_id=task_id,
+        )
+        return result, evidence
+
     def restore_execution_snapshot(self, snapshot: Snapshot) -> None:
         """Atomically restore integrated process-local state from a snapshot."""
 
@@ -408,6 +497,18 @@ class DNCSystem:
         registry_state = runtime_state.get("capability_registry")
         if registry_state is not None:
             restored_registry.restore_state(registry_state)
+        restored_memory = GovernedMemory()
+        memory_state = runtime_state.get("governed_memory")
+        if memory_state is not None:
+            restored_memory.restore(memory_state)
+        restored_skills = SkillRegistry()
+        skill_state = runtime_state.get("skill_registry")
+        if skill_state is not None:
+            restored_skills.restore(skill_state)
+        restored_learned_policies = LearnedPolicyRegistry()
+        learned_policy_state = runtime_state.get("learned_policy_registry")
+        if learned_policy_state is not None:
+            restored_learned_policies.restore(learned_policy_state)
 
         restored_counters = {
             "cycle_count": int(runtime_state.get("cycle_count", self._cycle_count)),
@@ -441,6 +542,12 @@ class DNCSystem:
         self.cognitive_state = restored_cognitive_state
         if registry_state is not None:
             self.capability_registry.restore_state(restored_registry.snapshot_state())
+        if memory_state is not None:
+            self.governed_memory.restore(restored_memory.snapshot())
+        if skill_state is not None:
+            self.skill_registry.restore(restored_skills.snapshot())
+        if learned_policy_state is not None:
+            self.learned_policy_registry.restore(restored_learned_policies.snapshot())
         self._cycle_count = restored_counters["cycle_count"]
         self._proposals_generated = restored_counters["proposals_generated"]
         self._proposals_authorized = restored_counters["proposals_authorized"]
