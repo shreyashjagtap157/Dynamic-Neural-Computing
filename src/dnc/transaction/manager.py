@@ -59,7 +59,19 @@ class TransactionManager:
             return False, ctx
 
         # 2. Staging Sandbox Isolation (deep copy of graph for staging)
-        staging_graph = copy.deepcopy(graph)
+        try:
+            staging_graph = copy.deepcopy(graph)
+        except Exception as exc:
+            ctx.state = TransactionState.FAILED
+            ctx.error_message = f"Staging snapshot failed: {exc}"
+            if self.provenance_log is not None:
+                self.provenance_log.append(
+                    event_type=EventType.STRUCTURAL_TRANSACTION_ROLLED_BACK,
+                    step_index=None,
+                    causal_ref=last_ref,
+                    payload={"tx_id": str(tx_id), "reason": ctx.error_message},
+                )
+            return False, ctx
 
         # 3. VALIDATE and APPLY operations on staging graph
         ctx.state = TransactionState.APPLYING
@@ -77,7 +89,23 @@ class TransactionManager:
                     )
                 return False, ctx
 
-            success, warns, op_undo = self.mutation_engine.apply_operation(staging_graph, op)
+            try:
+                staging_operation = copy.deepcopy(op)
+            except Exception as exc:
+                ctx.state = TransactionState.ROLLING_BACK
+                ctx.error_message = f"Operation isolation failed: {exc}"
+                self._rollback_staging(graph, staging_graph, ctx)
+                if self.provenance_log is not None:
+                    self.provenance_log.append(
+                        event_type=EventType.STRUCTURAL_TRANSACTION_ROLLED_BACK,
+                        step_index=None,
+                        causal_ref=last_ref,
+                        payload={"tx_id": str(tx_id), "reason": ctx.error_message},
+                    )
+                return False, ctx
+            success, warns, op_undo = self.mutation_engine.apply_operation(
+                staging_graph, staging_operation
+            )
             if not success:
                 ctx.state = TransactionState.ROLLING_BACK
                 ctx.error_message = f"Mutation application failed: {warns}"

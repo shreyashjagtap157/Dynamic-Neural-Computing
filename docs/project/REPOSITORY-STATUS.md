@@ -17,13 +17,13 @@ reference implementations unless their deployment profiles explicitly bind quali
 
 ## Current verified baseline
 
-- The authoritative pytest suite passes **430 tests**, with **2 intentional environment-dependent skips**.
+- The authoritative pytest suite passes **437 tests**, with **2 intentional environment-dependent skips**.
 - The Phase 12 canonical lifecycle audit passes **8/8**.
 - The Phase 13 benchmark harness integrity audit passes **3/3**.
 - Production source passes Ruff and Python byte-compilation.
 - Editable package installation succeeds from `pyproject.toml`.
 - Specification reference and RFC 2119 invariant-declaration checks pass.
-- Architecture conformance passes: **30/30** discovered invariants have executable coverage and all **34/34** conformance tests pass.
+- Architecture conformance passes: **30/30** discovered invariants have executable coverage and all **35/35** conformance tests pass.
 - The Phase 15 controlled hidden campaign is reproducible at evidence grade E2 with zero budget violations; it shows parity, not superiority, against the included strong reference baselines.
 - The Phase 16 local readiness audit is intentionally **NO-GO** because external canary outcomes and independent human approvals are absent.
 
@@ -66,6 +66,9 @@ Test success establishes the implemented behavior only. It does not establish em
 22. Evolved Generic DNC-IR to schema 1.3.0 with enforced idempotency, effect, placement, tenant,
     permission, classification, residency, trust-zone, isolation, and confidential-compute contracts;
     governed graphs now require a satisfying execution context before projection.
+23. Hardened transaction payload isolation and rollback faults, canonical structural replay evidence,
+    trace-only versus fresh-runtime replay claims, and snapshot 0.2 R2/R3/R4 admission with
+    integrity-bound provider recording and effect-ledger evidence.
 
 ## Known critical gaps
 

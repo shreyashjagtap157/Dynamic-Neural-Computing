@@ -36,6 +36,7 @@ from dnc.execution.execution_trace import (
     TerminationReason,
 )
 from dnc.state.execution_state import ExecutionState
+from dnc.execution.snapshot import ReproducibilityGrade
 
 
 def test_ec1_decision_policy_interface():
@@ -272,6 +273,9 @@ def test_ec16_replay_engine_replay_full_trace():
     assert result.trace_id == trace.trace_id
     assert result.replayed_steps == 3
     assert result.all_matched
+    assert result.reproducibility_grade is ReproducibilityGrade.R1_MANIFEST_ONLY
+    assert not result.verified_reexecution
+    assert not result.is_identical
     print("PASS: ec16_replay_engine_replay_full_trace")
 
 

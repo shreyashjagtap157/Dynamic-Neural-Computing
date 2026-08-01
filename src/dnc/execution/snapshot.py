@@ -19,7 +19,8 @@ from dnc.ir.serialization import DNWIRSerializer
 
 
 SNAPSHOT_SCHEMA_ID = "dnc.execution.snapshot_manifest"
-SNAPSHOT_SCHEMA_VERSION = "0.1.0"
+SNAPSHOT_SCHEMA_VERSION = "0.2.0"
+SUPPORTED_SNAPSHOT_SCHEMA_VERSIONS = frozenset({"0.1.0", SNAPSHOT_SCHEMA_VERSION})
 
 
 class ReproducibilityGrade(str, Enum):
@@ -30,6 +31,10 @@ class ReproducibilityGrade(str, Enum):
     R2_DETERMINISTIC_CORE = "R2_DETERMINISTIC_CORE"
     R3_RECORDED_EXTERNALS = "R3_RECORDED_EXTERNALS"
     R4_ENVIRONMENT_REPLAY = "R4_ENVIRONMENT_REPLAY"
+
+    @property
+    def rank(self) -> int:
+        return list(type(self)).index(self)
 
 
 class SharedStateKind(str, Enum):
@@ -171,7 +176,9 @@ class SnapshotManifest:
     runtime_state_hash: str | None = None
     rng_state_hash: str | None = None
     provider_recording_ids: tuple[str, ...] = ()
+    provider_recordings_hash: str | None = None
     effect_ids: tuple[str, ...] = ()
+    effects_hash: str | None = None
     captured_state: tuple[str, ...] = ()
     uncaptured_state: tuple[str, ...] = ()
     cleanup_required: bool = False
@@ -188,7 +195,7 @@ class SnapshotManifest:
             raise TypeError("isolation_grade MUST be IsolationGrade")
         if self.schema_id != SNAPSHOT_SCHEMA_ID:
             raise ValueError("unsupported snapshot schema_id")
-        if self.schema_version != SNAPSHOT_SCHEMA_VERSION:
+        if self.schema_version not in SUPPORTED_SNAPSHOT_SCHEMA_VERSIONS:
             raise ValueError("unsupported snapshot schema_version")
 
     def declares_uncaptured_state(self) -> bool:
@@ -206,6 +213,90 @@ class Snapshot:
     runtime_state: dict[str, Any] | None = None
     provider_recordings: tuple[ProviderRecording, ...] = ()
     effects: tuple[EffectLedgerEntry, ...] = ()
+
+
+@dataclass(frozen=True)
+class ReplayAdmission:
+    """Evidence-backed decision for a requested snapshot replay grade."""
+
+    requested_grade: ReproducibilityGrade
+    declared_grade: ReproducibilityGrade
+    admitted: bool
+    reasons: tuple[str, ...] = ()
+
+
+def assess_replay_admission(
+    snapshot: Snapshot,
+    requested_grade: ReproducibilityGrade,
+) -> ReplayAdmission:
+    """Admit only replay grades supported by concrete snapshot evidence."""
+
+    if not isinstance(requested_grade, ReproducibilityGrade):
+        raise TypeError("requested_grade MUST be ReproducibilityGrade")
+    manifest = snapshot.manifest
+    reasons: list[str] = []
+    if requested_grade.rank > manifest.reproducibility_grade.rank:
+        reasons.append("REQUEST_EXCEEDS_DECLARED_GRADE")
+    if requested_grade.rank >= ReproducibilityGrade.R1_MANIFEST_ONLY.rank:
+        if not manifest.snapshot_id or not manifest.source_state_id:
+            reasons.append("MANIFEST_IDENTITY_MISSING")
+    if requested_grade.rank >= ReproducibilityGrade.R2_DETERMINISTIC_CORE.rank:
+        if snapshot.graph is None or not manifest.graph_hash:
+            reasons.append("DETERMINISTIC_GRAPH_EVIDENCE_MISSING")
+        elif _hash_text(DNWIRSerializer.to_json(snapshot.graph)) != manifest.graph_hash:
+            reasons.append("GRAPH_HASH_MISMATCH")
+        if "graph" not in manifest.captured_state:
+            reasons.append("GRAPH_NOT_DECLARED_CAPTURED")
+        actual_runtime_hash = (
+            _hash_json(snapshot.runtime_state) if snapshot.runtime_state is not None else None
+        )
+        if actual_runtime_hash != manifest.runtime_state_hash:
+            reasons.append("RUNTIME_STATE_HASH_MISMATCH")
+    if requested_grade.rank >= ReproducibilityGrade.R3_RECORDED_EXTERNALS.rank:
+        if manifest.schema_version != SNAPSHOT_SCHEMA_VERSION:
+            reasons.append("LEGACY_MANIFEST_CANNOT_PROVE_RECORDED_EXTERNALS")
+        recording_ids = tuple(item.recording_id for item in snapshot.provider_recordings)
+        effect_ids = tuple(item.effect_id for item in snapshot.effects)
+        if tuple(sorted(recording_ids)) != tuple(sorted(manifest.provider_recording_ids)):
+            reasons.append("PROVIDER_RECORDING_EVIDENCE_MISMATCH")
+        if tuple(sorted(effect_ids)) != tuple(sorted(manifest.effect_ids)):
+            reasons.append("EFFECT_LEDGER_EVIDENCE_MISMATCH")
+        if manifest.provider_recordings_hash != snapshot_evidence_hash(
+            snapshot.provider_recordings
+        ):
+            reasons.append("PROVIDER_RECORDING_HASH_MISMATCH")
+        if manifest.effects_hash != snapshot_evidence_hash(snapshot.effects):
+            reasons.append("EFFECT_LEDGER_HASH_MISMATCH")
+        if "provider_responses" not in manifest.captured_state:
+            reasons.append("PROVIDER_RESPONSES_NOT_CAPTURED")
+        if "effect_ledger" not in manifest.captured_state:
+            reasons.append("EFFECT_LEDGER_NOT_CAPTURED")
+        if "provider_responses" in manifest.uncaptured_state:
+            reasons.append("PROVIDER_RESPONSES_DECLARED_UNCAPTURED")
+        external_kinds = {
+            "filesystem",
+            "database",
+            "network",
+            "object_store",
+            "queue",
+        }
+        if external_kinds.intersection(manifest.uncaptured_state):
+            reasons.append("EXTERNAL_STATE_DECLARED_UNCAPTURED")
+        if manifest.isolation_grade.rank < IsolationGrade.I3_RECORDED_EXTERNALS.rank:
+            reasons.append("ISOLATION_BELOW_RECORDED_EXTERNALS")
+    if requested_grade is ReproducibilityGrade.R4_ENVIRONMENT_REPLAY:
+        if manifest.uncaptured_state:
+            reasons.append("ENVIRONMENT_STATE_REMAINS_UNCAPTURED")
+        if "environment" not in manifest.captured_state:
+            reasons.append("ENVIRONMENT_NOT_CAPTURED")
+        if manifest.isolation_grade is not IsolationGrade.I4_SANDBOXED_ENVIRONMENT:
+            reasons.append("ENVIRONMENT_ISOLATION_NOT_SANDBOXED")
+    return ReplayAdmission(
+        requested_grade=requested_grade,
+        declared_grade=manifest.reproducibility_grade,
+        admitted=not reasons,
+        reasons=tuple(reasons),
+    )
 
 
 def reject_unsafe_shared_state(declarations: tuple[SharedStateDeclaration, ...]) -> None:
@@ -525,6 +616,61 @@ class ReferenceSnapshotManager:
             runtime_state=copy.deepcopy(runtime_state),
         )
 
+    def capture_recorded_execution(
+        self,
+        graph: StructuralGraph,
+        *,
+        snapshot_id: str,
+        source_state_id: str,
+        provider_recordings: tuple[ProviderRecording, ...],
+        effects: tuple[EffectLedgerEntry, ...] = (),
+        runtime_state: dict[str, Any] | None = None,
+    ) -> Snapshot:
+        """Capture and integrity-bind deterministic core plus recorded externals."""
+
+        recordings = tuple(sorted(provider_recordings, key=lambda item: item.recording_id))
+        effect_entries = tuple(sorted(effects, key=lambda item: item.effect_id))
+        graph_json = DNWIRSerializer.to_json(graph)
+        runtime_hash = _hash_json(runtime_state) if runtime_state is not None else None
+        manifest = SnapshotManifest(
+            snapshot_id=snapshot_id,
+            source_state_id=source_state_id,
+            reproducibility_grade=ReproducibilityGrade.R3_RECORDED_EXTERNALS,
+            isolation_grade=IsolationGrade.I3_RECORDED_EXTERNALS,
+            graph_hash=_hash_text(graph_json),
+            runtime_state_hash=runtime_hash,
+            provider_recording_ids=tuple(item.recording_id for item in recordings),
+            provider_recordings_hash=snapshot_evidence_hash(recordings),
+            effect_ids=tuple(item.effect_id for item in effect_entries),
+            effects_hash=snapshot_evidence_hash(effect_entries),
+            captured_state=(
+                "graph",
+                *(("runtime_state",) if runtime_state is not None else ()),
+                "provider_responses",
+                "effect_ledger",
+            ),
+            uncaptured_state=("accelerator", "process_environment"),
+            cleanup_required=any(
+                item.committed and item.reversible and item.compensated_by is None
+                for item in effect_entries
+            ),
+        )
+        snapshot = Snapshot(
+            manifest,
+            copy.deepcopy(graph),
+            copy.deepcopy(runtime_state),
+            copy.deepcopy(recordings),
+            copy.deepcopy(effect_entries),
+        )
+        admission = assess_replay_admission(
+            snapshot, ReproducibilityGrade.R3_RECORDED_EXTERNALS
+        )
+        if not admission.admitted:
+            raise DNCExecutionError(
+                f"recorded-external snapshot admission failed: {admission.reasons}"
+            )
+        return snapshot
+
     def restore_graph(self, snapshot: Snapshot) -> StructuralGraph:
         """Restore a graph from a process-local snapshot."""
 
@@ -573,6 +719,12 @@ def request_hash(provider_id: str, capability: str, payload: Any) -> str:
             "payload": payload,
         }
     )
+
+
+def snapshot_evidence_hash(value: Any) -> str:
+    """Return the canonical integrity hash used by snapshot evidence fields."""
+
+    return _hash_json(value)
 
 
 def _hash_text(value: str) -> str:

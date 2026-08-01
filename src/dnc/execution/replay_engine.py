@@ -16,6 +16,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+from dnc.execution.snapshot import ReproducibilityGrade
+
 from dnc.execution.execution_trace import (
     ExecutionTrace,
     TerminationReason,
@@ -31,6 +33,15 @@ class ReplayConfig:
     max_steps: Optional[int] = None
     use_recorded_provider_responses: bool = True
     use_recorded_timestamps: bool = True
+    required_grade: ReproducibilityGrade | None = None
+
+    def __post_init__(self) -> None:
+        if self.max_steps is not None and self.max_steps < 0:
+            raise ValueError("max_steps MUST be non-negative")
+        if self.required_grade is not None and not isinstance(
+            self.required_grade, ReproducibilityGrade
+        ):
+            raise TypeError("required_grade MUST be ReproducibilityGrade")
 
 
 @dataclass(frozen=True)
@@ -56,6 +67,9 @@ class ReplayResult:
     deviations: List[str] = field(default_factory=list)
     replayed_module_sequence: List[str] = field(default_factory=list)
     termination_reason: Optional[TerminationReason] = None
+    reproducibility_grade: ReproducibilityGrade = ReproducibilityGrade.R1_MANIFEST_ONLY
+    verified_reexecution: bool = False
+    evidence: tuple[str, ...] = ()
 
     @property
     def match_percentage(self) -> float:
@@ -67,7 +81,7 @@ class ReplayResult:
     @property
     def is_identical(self) -> bool:
         """Whether replay completed without any decision divergence."""
-        return self.all_matched and not self.deviations
+        return self.verified_reexecution and self.all_matched and not self.deviations
 
 
 class ReplayEngine:
@@ -108,6 +122,8 @@ class ReplayEngine:
             raise ValueError("Trace missing required fields for replay")
 
         if runtime is None or es is None:
+            achieved_grade = ReproducibilityGrade.R1_MANIFEST_ONLY
+            self._require_grade(achieved_grade)
             step_results = [self.replay_step(trace, i) for i in range(len(trace.execution_record))]
             return ReplayResult(
                 trace_id=trace.trace_id,
@@ -116,11 +132,20 @@ class ReplayEngine:
                 all_matched=True,
                 step_results=step_results,
                 termination_reason=trace.termination_reason,
+                reproducibility_grade=achieved_grade,
+                verified_reexecution=False,
+                evidence=("TRACE_INSPECTION_ONLY",),
             )
 
         response_map = response_map or self._recorded_response_map(trace)
         if self._config.use_recorded_provider_responses and not response_map:
             raise ValueError("Trace has no recorded provider/module responses")
+        achieved_grade = (
+            ReproducibilityGrade.R3_RECORDED_EXTERNALS
+            if self._config.use_recorded_provider_responses and response_map
+            else ReproducibilityGrade.R2_DETERMINISTIC_CORE
+        )
+        self._require_grade(achieved_grade)
         # Bind the recorded responses as the dispatch output for each node.
         runtime.set_dispatch_fn(lambda mid: response_map[str(mid.type_id)])
         if hasattr(runtime, "_provider_mode"):
@@ -197,6 +222,14 @@ class ReplayEngine:
             deviations=deviations,
             replayed_module_sequence=replayed_module_sequence,
             termination_reason=trace.termination_reason,
+            reproducibility_grade=achieved_grade,
+            verified_reexecution=True,
+            evidence=(
+                "FRESH_RUNTIME_REEXECUTION",
+                "RECORDED_RESPONSES"
+                if achieved_grade is ReproducibilityGrade.R3_RECORDED_EXTERNALS
+                else "DETERMINISTIC_CORE_ONLY",
+            ),
         )
 
     def replay_step(self, trace: ExecutionTrace, step_index: int) -> ReplayStepResult:
@@ -241,3 +274,10 @@ class ReplayEngine:
                 if "recorded_output" in invocation.metadata:
                     responses[invocation.module_type] = invocation.metadata["recorded_output"]
         return responses
+
+    def _require_grade(self, achieved: ReproducibilityGrade) -> None:
+        required = self._config.required_grade if self._config is not None else None
+        if required is not None and achieved.rank < required.rank:
+            raise ValueError(
+                f"replay achieved {achieved.value}, below required {required.value}"
+            )

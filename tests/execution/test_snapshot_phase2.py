@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from dnc.execution.snapshot import (
@@ -10,6 +12,7 @@ from dnc.execution.snapshot import (
     IdempotencyRegistry,
     IsolationGrade,
     ProviderReplayStore,
+    ProviderRecording,
     RecordingExecutionProvider,
     ReferenceSnapshotManager,
     ReproducibilityGrade,
@@ -19,12 +22,14 @@ from dnc.execution.snapshot import (
     SharedStateDeclaration,
     SharedStateKind,
     SnapshotManifest,
+    Snapshot,
+    assess_replay_admission,
     default_mutable_state_audit,
     reject_unsafe_shared_state,
     request_hash,
     run_with_guards,
 )
-from dnc import DNCSystem
+from dnc import DNCSystem, ReplayAdmission as PublicReplayAdmission
 from dnc.execution.execution_provider import ExecutionCapability, ReferenceExecutionProvider
 from dnc.kernel.errors import DNCCancellationError, DNCExecutionError
 from dnc.execution.torch_snapshot import PyTorchSnapshotManager, torch_available
@@ -88,6 +93,17 @@ def test_reference_snapshot_restore_preserves_graph_and_source_can_diverge() -> 
     assert DNWIRSerializer.to_json(restored) == DNWIRSerializer.to_json(snapshot.graph)
     assert snapshot.manifest.isolation_grade is IsolationGrade.I1_GRAPH_ONLY
     assert snapshot.manifest.reproducibility_grade is ReproducibilityGrade.R2_DETERMINISTIC_CORE
+
+    admitted = assess_replay_admission(
+        snapshot, ReproducibilityGrade.R2_DETERMINISTIC_CORE
+    )
+    denied = assess_replay_admission(
+        snapshot, ReproducibilityGrade.R3_RECORDED_EXTERNALS
+    )
+    assert isinstance(admitted, PublicReplayAdmission)
+    assert admitted.admitted
+    assert not denied.admitted
+    assert "REQUEST_EXCEEDS_DECLARED_GRADE" in denied.reasons
 
 
 def test_effect_ledger_entry_tracks_reversibility_and_commit_state() -> None:
@@ -259,6 +275,49 @@ def test_failed_restore_does_not_mutate_active_system_graph() -> None:
         raise AssertionError("bad snapshot restore must fail")
 
     assert DNWIRSerializer.to_json(system.graph) == before
+
+
+def test_replay_admission_rejects_tampered_snapshot_evidence() -> None:
+    system = DNCSystem(execution_id="admission-tamper")
+    snapshot = system.capture_execution_snapshot("snap-admission")
+    snapshot.graph.add_unit(_unit("tampered"))
+
+    admission = assess_replay_admission(
+        snapshot, ReproducibilityGrade.R2_DETERMINISTIC_CORE
+    )
+
+    assert not admission.admitted
+    assert "GRAPH_HASH_MISMATCH" in admission.reasons
+
+
+def test_recorded_external_admission_integrity_binds_recording_content() -> None:
+    recording = ProviderRecording(
+        "recording-1", "provider", "request-hash", {"answer": 42}
+    )
+    snapshot = ReferenceSnapshotManager().capture_recorded_execution(
+        _graph(),
+        snapshot_id="snap-r3",
+        source_state_id="state-r3",
+        provider_recordings=(recording,),
+    )
+
+    admitted = assess_replay_admission(
+        snapshot, ReproducibilityGrade.R3_RECORDED_EXTERNALS
+    )
+    assert admitted.admitted
+
+    tampered = Snapshot(
+        snapshot.manifest,
+        snapshot.graph,
+        provider_recordings=(
+            replace(recording, response={"answer": "tampered"}),
+        ),
+    )
+    denied = assess_replay_admission(
+        tampered, ReproducibilityGrade.R3_RECORDED_EXTERNALS
+    )
+    assert not denied.admitted
+    assert "PROVIDER_RECORDING_HASH_MISMATCH" in denied.reasons
 
 
 def test_tampered_runtime_state_is_rejected_without_mutating_system() -> None:

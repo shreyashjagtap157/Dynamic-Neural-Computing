@@ -4,6 +4,9 @@ from dnc.ir.graph import StructuralGraph, EdgeType
 from dnc.ir.operations import IROperation, OperationType
 from dnc.transaction.manager import TransactionManager
 from dnc.transaction.context import TransactionState
+from dnc.ir.serialization import DNWIRSerializer
+from dnc.ir.contracts import SideEffectContract
+from dnc.kernel.contracts import EffectType, IsolationGrade, SideEffectClass
 
 def test_transaction_manager_commit():
     g = StructuralGraph(graph_id=GraphID("g_tx"), version=GraphVersion(1, 0, 0, 0))
@@ -38,3 +41,69 @@ def test_transaction_manager_occ_conflict():
     assert ctx.state == TransactionState.FAILED
     assert "OCC Conflict" in ctx.error_message
     assert len(g.units) == 0  # Graph untouched
+
+
+def test_transaction_commit_isolates_caller_owned_operation_payloads():
+    graph = StructuralGraph(GraphID("isolated-payload"))
+    unit = ComputationalUnit(
+        UnitID("unit"), "Original", StructureDimension.PRIMITIVE,
+        VisibilityDimension.INSPECTABLE, LifecycleDimension.BASE,
+    )
+
+    success, _ = TransactionManager().execute_transaction(
+        graph, [IROperation(OperationType.ADD_UNIT, {"unit": unit})]
+    )
+    assert success
+    unit.name = "Caller mutation"
+    unit.metadata["caller"] = True
+
+    assert graph.units["unit"].name == "Original"
+    assert "caller" not in graph.units["unit"].metadata
+
+
+def test_failed_governed_transaction_leaves_active_graph_byte_identical():
+    graph = StructuralGraph(GraphID("governed-rollback"))
+    before = DNWIRSerializer.to_json(graph)
+    unsafe_effect = SideEffectContract(
+        SideEffectClass.COMPENSATABLE,
+        frozenset({EffectType.FILE_WRITE}),
+        "delete-file",
+        IsolationGrade.I2_PROCESS_LOCAL,
+    )
+    unit = ComputationalUnit(
+        UnitID("unsafe"), "Unsafe", StructureDimension.PRIMITIVE,
+        VisibilityDimension.INSPECTABLE, LifecycleDimension.BASE,
+    )
+    unit.contract.side_effects = unsafe_effect
+
+    success, ctx = TransactionManager().execute_transaction(
+        graph, [IROperation(OperationType.ADD_UNIT, {"unit": unit})]
+    )
+
+    assert not success
+    assert ctx.state is TransactionState.ROLLED_BACK
+    assert "INV_EFFECT_IDEMPOTENCY_REQUIRED" in ctx.error_message
+    assert DNWIRSerializer.to_json(graph) == before
+
+
+def test_uncopyable_operation_payload_rolls_back_without_raising_or_mutating():
+    class Uncopyable:
+        def __deepcopy__(self, memo):
+            raise RuntimeError("opaque handle cannot be copied")
+
+    graph = StructuralGraph(GraphID("uncopyable-operation"))
+    unit = ComputationalUnit(
+        UnitID("opaque"), "Opaque", StructureDimension.PRIMITIVE,
+        VisibilityDimension.INSPECTABLE, LifecycleDimension.BASE,
+        metadata={"handle": Uncopyable()},
+    )
+    before = DNWIRSerializer.to_json(graph)
+
+    success, ctx = TransactionManager().execute_transaction(
+        graph, [IROperation(OperationType.ADD_UNIT, {"unit": unit})]
+    )
+
+    assert not success
+    assert ctx.state is TransactionState.ROLLED_BACK
+    assert "Operation isolation failed" in ctx.error_message
+    assert DNWIRSerializer.to_json(graph) == before

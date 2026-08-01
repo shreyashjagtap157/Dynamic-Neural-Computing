@@ -12,8 +12,10 @@ from dnc.execution.snapshot import (
     EffectType,
     IsolationGrade,
     ReproducibilityGrade,
+    ReplayAdmission,
     Snapshot,
     SnapshotManifest,
+    assess_replay_admission,
 )
 
 __all__ = [
@@ -24,8 +26,10 @@ __all__ = [
     "ExecutionCore",
     "IsolationGrade",
     "ReferenceExecutionCore",
+    "ReplayAdmission",
     "ReproducibilityGrade",
     "Snapshot",
     "SnapshotManifest",
     "SystemStateSnapshot",
+    "assess_replay_admission",
 ]

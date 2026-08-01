@@ -6,7 +6,7 @@
 
 **Starting commit:** `2b5fb84`
 
-**Current state:** M1 in progress; `M1-IR-001` through `M1-IR-003` complete
+**Current state:** M1 in progress; `M1-IR-001` through `M1-IR-003` and `M1-RT-001` complete
 
 ## Completed work package
 
@@ -59,21 +59,41 @@ exact ID with `git log --oneline --grep='Add typed DNC-IR ports and edge contrac
 The completion commit is the commit titled `Enforce DNC-IR execution governance contracts`; resolve
 its exact ID with `git log --oneline --grep='Enforce DNC-IR execution governance contracts' -1`.
 
+### M1-RT-001 — Atomic rollback and explicit replay grades
+
+- Deep-isolates operation payloads before staging application so caller-owned objects cannot mutate
+  committed graph state, and converts graph/operation copy faults into deterministic failed or
+  rolled-back transaction results without active-state mutation.
+- Strengthens structural replay verification from ID/count comparison to complete canonical 1.3.0
+  content equality and emits an R2 result with canonical hash and failure index/reason.
+- Classifies trace-only inspection as R1 and prevents it from reporting identical re-execution;
+  fresh-runtime deterministic replay reports R2 or R3 depending on recorded-response evidence and can
+  enforce a caller-required minimum grade.
+- Versions snapshot manifests to 0.2 while reading 0.1, adds canonical provider-recording and
+  effect-ledger hashes, and provides explicit admission decisions with stable reason codes.
+- Provides a maintained R3 recorded-execution capture path and rejects tampered graphs, recordings,
+  effects, incomplete captured-state declarations, insufficient isolation, and R4 environment
+  overclaims.
+
+The completion commit is the commit titled `Harden atomic rollback and replay grade admission`;
+resolve its exact ID with
+`git log --oneline --grep='Harden atomic rollback and replay grade admission' -1`.
+
 ## Verification evidence
 
-- `python -W error -m pytest -q`: 430 passed, 2 intentional environment-dependent skips.
+- `python -W error -m pytest -q`: 437 passed, 2 intentional environment-dependent skips.
 - `python -m compileall -q src`: passed.
 - `python -m ruff check src tests tools/generate_conformance_report.py`: passed.
 - `PYTHONPATH=src python scripts/audits/phase12_system_audit.py`: 8/8 passed.
 - Specification reference and RFC 2119 checks: passed.
-- Architecture conformance: 30/30 invariants covered, 34/34 tests passed, 4/4 ACDs resolved.
+- Architecture conformance: 30/30 invariants covered, 35/35 tests passed, 4/4 ACDs resolved.
 - A locally built wheel contains all supported 1.1.0, 1.2.0, and 1.3.0 structural-graph schemas.
 
 ## Claims and residual risks
 
 This work supports a versioned and packaged Generic DNC-IR envelope plus typed port/edge validation.
 It does not yet provide a general schema migration framework beyond the explicit 1.1.0/1.2.0 readers,
-nor does it complete M1's replay-grade, SDK, registry, property, fuzz, concurrency, or failure-testing
+nor does it complete M1's SDK, registry, property, fuzz, concurrency, or broader failure-testing
 commitments. The headerless legacy path is intentionally less strict and should be migrated before
 any future removal.
 
@@ -84,9 +104,13 @@ Rollback of `M1-IR-003` returns canonical output to 1.2.0. Consumers must not pe
 governance declarations if they require that rollback, because silently dropping execution security
 requirements is not an allowed migration.
 
+Rollback of `M1-RT-001` removes snapshot 0.2 evidence hashes and replay admission. Persisted 0.2
+manifests must be retained or explicitly downgraded only to claims supported by 0.1 fields; R3/R4
+claims must not survive such a downgrade.
+
 ## Exact next point
 
-Implement `M1-RT-001`: audit existing transaction, compensation, snapshot, and replay behavior against
-the roadmap's atomic rollback and explicit replay-grade requirement. Preserve already-proven semantics,
-add missing grade admission checks and evidence propagation, fault-test governed 1.3.0 graphs, and
-avoid equating graph-only replay with environment or external-effect reproduction.
+Implement `M1-SDK-001`: define a versioned plugin manifest and loader boundary, a stable Python SDK
+facade, a minimal CLI for graph validate/inspect/project operations, and content-addressed artifact and
+graph registries. Keep optional plugins out of the core dependency set, enforce schema/governance at
+registration and load time, and add compatibility plus command-level failure tests.

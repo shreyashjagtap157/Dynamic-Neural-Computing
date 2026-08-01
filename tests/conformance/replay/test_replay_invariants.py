@@ -2,6 +2,8 @@
 
 from dataclasses import replace
 
+import pytest
+
 from dnc.execution.execution_provider import (
     CostEstimate,
     ExecutionCapability,
@@ -9,7 +11,8 @@ from dnc.execution.execution_provider import (
     ProviderMetadata,
 )
 from dnc.execution.execution_trace import DecisionRecord
-from dnc.execution.replay_engine import ReplayEngine
+from dnc.execution.replay_engine import ReplayConfig, ReplayEngine
+from dnc.execution.snapshot import ReproducibilityGrade
 from dnc.runtime.runtime import ProviderMode, Runtime
 from dnc.runtime.types import ModuleContract, ModuleTypeID
 
@@ -68,6 +71,8 @@ def test_inv_rep_1_replays_every_step_in_order() -> None:
     result = ReplayEngine().replay(trace, runtime, state)
     assert result.replayed_steps == len(trace.execution_record)
     assert [item.step_index for item in result.step_results] == [0, 1]
+    assert result.verified_reexecution
+    assert result.reproducibility_grade is ReproducibilityGrade.R3_RECORDED_EXTERNALS
 
 
 def test_inv_rep_2_uses_recorded_responses_not_fresh_provider_calls() -> None:
@@ -127,3 +132,14 @@ def test_inv_rep_5_deterministic_trace_contains_seed_inputs_time_and_responses()
     assert invocations and all("recorded_output" in item.metadata for item in invocations)
     runtime, state = _runtime()
     assert ReplayEngine().replay(trace, runtime, state).is_identical
+
+
+def test_trace_inspection_cannot_satisfy_deterministic_core_grade() -> None:
+    trace = _trace()
+    with pytest.raises(ValueError, match="below required"):
+        ReplayEngine().replay(
+            trace,
+            config=ReplayConfig(
+                required_grade=ReproducibilityGrade.R2_DETERMINISTIC_CORE
+            ),
+        )

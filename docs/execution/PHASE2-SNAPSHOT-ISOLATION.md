@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-31
 **Phase:** `Phase 2 — Snapshot-capable execution, isolation grades, and truthful counterfactuals`
-**Status:** Initial reference slice
+**Status:** Reference implementation hardened through `M1-RT-001`
 
 ## Implemented contracts
 
@@ -10,7 +10,7 @@
 |---|---|
 | `SnapshotManifest` | `src/dnc/execution/snapshot.py` |
 | `ReproducibilityGrade` | `src/dnc/execution/snapshot.py` |
-| `IsolationGrade` | `src/dnc/execution/snapshot.py` |
+| `IsolationGrade` | `src/dnc/kernel/contracts.py` (compatibly re-exported) |
 | `EffectLedgerEntry` | `src/dnc/execution/snapshot.py` |
 | `ProviderRecording` | `src/dnc/execution/snapshot.py` |
 | `ReferenceSnapshotManager` | `src/dnc/execution/snapshot.py` |
@@ -23,6 +23,8 @@
 | `SharedStateDeclaration` | `src/dnc/execution/snapshot.py` |
 | `SandboxPolicy` | `src/dnc/execution/snapshot.py` |
 | `PyTorchSnapshotManager` | `src/dnc/execution/torch_snapshot.py` |
+| `ReplayAdmission` / `assess_replay_admission` | `src/dnc/execution/snapshot.py` |
+| `StructuralReplayResult` | `src/dnc/replay/structural_replay.py` |
 
 ## Grade definitions
 
@@ -38,7 +40,6 @@ Isolation:
 
 - `I0_NONE`: no isolation claim;
 - `I1_GRAPH_ONLY`: graph clone only;
-- `I1_GRAPH_ONLY`: transactional in-process DNC state clone;
 - `I2_PROCESS_LOCAL`: dedicated-process local state isolation;
 - `I3_RECORDED_EXTERNALS`: external interactions are recorded/replayed;
 - `I4_SANDBOXED_ENVIRONMENT`: filesystem/network/process isolation is qualified.
@@ -53,6 +54,18 @@ process-environment state.
 
 This prevents a graph-only clone from being mislabeled as a same-state counterfactual.
 
+Snapshot manifest 0.2 adds integrity hashes for provider recordings and effect-ledger evidence.
+Replay grades are now admitted rather than trusted from declarations alone:
+
+- `R2` requires a captured canonical graph with matching hash and runtime-state integrity;
+- `R3` additionally requires current-version evidence hashes, matching recording/effect IDs,
+  captured provider responses and effect ledger, and at least `I3` isolation;
+- `R4` additionally requires no uncaptured state, captured environment state, and `I4` isolation.
+
+`ReferenceSnapshotManager.capture_recorded_execution` is the maintained R3 construction path.
+Trace-only inspection remains R1 and cannot report identical re-execution. Fresh-runtime replay is
+R2 for deterministic-core-only runs or R3 when recorded responses are used.
+
 ## Replay and side-effect controls
 
 `RecordingExecutionProvider` supports:
@@ -63,3 +76,7 @@ This prevents a graph-only clone from being mislabeled as a same-state counterfa
 - `LIVE`: call through without recording.
 
 `EffectLedger`, `CleanupReconciler`, and `IdempotencyRegistry` provide the first source-state preservation controls for duplicate effects and reversible cleanup.
+
+Structural replay now reports an R2 evidence result with a canonical graph hash and verifies complete
+canonical graph content rather than only unit IDs and edge counts. It does not claim external or
+environment replay.
