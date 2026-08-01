@@ -90,6 +90,22 @@ class DurableWorkQueue:
     def status(self, work_id: str) -> WorkStatus:
         return self._status[work_id]
 
+    def snapshot(self):
+        return (
+            dict(self._items), dict(self._status), dict(self._leases),
+            dict(self._results), self._fencing,
+        )
+
+    def restore(self, state) -> None:
+        items, status, leases, results, fencing = state
+        if set(status) != set(items) or not set(leases) <= set(items) or not set(results) <= set(items):
+            raise ValueError("work queue backup references unknown work items")
+        self._items = dict(items)
+        self._status = dict(status)
+        self._leases = dict(leases)
+        self._results = dict(results)
+        self._fencing = int(fencing)
+
     def _require_lease(self, work_id: str, fencing_token: int) -> Lease:
         lease = self._leases.get(work_id)
         if lease is None or lease.fencing_token != fencing_token:

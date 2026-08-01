@@ -1,7 +1,7 @@
 # DNC Intent Traceability Matrix
 
 **Date:** 2026-08-01
-**Status:** Updated through Phase 12 reference implementation
+**Status:** Updated through Phase 16 local pilot governance
 **Primary sources:** `docs/DNC_INTENT_VS_IMPLEMENTATION_REVIEW_HANDOFF.md`, `docs/DNC_EXHAUSTIVE_FUTURE_IMPLEMENTATION_MASTER_PLAN.md`
 
 ## Purpose
@@ -26,7 +26,8 @@ This matrix connects the owner intent to specifications, implementation targets,
 | INTENT-012 | Support interruptible and resumable cognition | Master plan Phase 11 | Best-so-far state, checkpoint, resume record | Resume avoids unnecessary recomputation and preserves evidence |
 | INTENT-013 | Track capability competence, cost, permissions, failure modes, and degraded states | Master plan Phase 4; `src/dnc/cognition/capabilities.py` | Capability card registry and broker | Provider/tool dispatch negotiates features and reports unsupported capabilities |
 | INTENT-014 | Treat counterfactual isolation as graded and explicit | Baseline plus master plan Phase 2 | Snapshot manifest, effect ledger, reproducibility grade | Same-state claims declare uncaptured state |
-| INTENT-015 | Evaluate benefits on hidden, outcome-grounded workloads | Master plan Phase 15 | Hidden workload harness | Matched baselines and ablations support scoped claims |
+| INTENT-015 | Evaluate benefits on hidden, outcome-grounded workloads | Master plan Phase 15; `src/dnc/evaluation/scientific.py` | Frozen hidden campaign, required baselines/ablations, paired uncertainty, and immutable artifact | Controlled E2 supports harness/fixture claims only; strong-baseline superiority and independent reproduction remain unproven |
+| INTENT-016 | Prove bounded enterprise value before scoped release | Master plan Phase 16; `src/dnc/pilot/governance.py` | Ordered rollout, external outcome distinction, exercises, readiness, fingerprint-bound independent approvals, fail-closed GA review | Local gate is NO-GO; sustained E3 outcomes and human owner approvals remain external requirements |
 
 ## Next required updates
 

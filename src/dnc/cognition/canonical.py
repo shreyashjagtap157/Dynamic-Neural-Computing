@@ -25,6 +25,8 @@ def canonical_data(value: Any) -> Any:
 
     if isinstance(value, Enum):
         return value.value
+    if isinstance(value, bytes):
+        return {"$bytes_hex": value.hex()}
     if is_dataclass(value):
         return canonical_data(asdict(value))
     if isinstance(value, dict):

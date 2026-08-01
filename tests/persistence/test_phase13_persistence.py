@@ -8,7 +8,9 @@ from dnc.persistence import (
     DurableEvent,
     DurableWorkQueue,
     EventRepository,
+    FaultCampaignResult,
     OutboxMessage,
+    RecoveryObjectives,
     WorkerResult,
     WorkItem,
     WorkStatus,
@@ -16,6 +18,8 @@ from dnc.persistence import (
     require_optional_adapter,
     temporal_available,
 )
+from dnc.cognition.canonical import canonical_data
+from dnc.system import DNCSystem
 
 
 def _event(version=1, tenant="tenant-a", event_id=None):
@@ -92,6 +96,7 @@ def test_content_addressed_store_integrity_and_cross_tenant_isolation() -> None:
     store.corrupt_for_test(digest, tenant_id="tenant-a", data=b"corrupt")
     with pytest.raises(ValueError, match="integrity"):
         store.get(digest, tenant_id="tenant-a")
+    assert canonical_data(b"\x00\xff") == {"$bytes_hex": "00ff"}
 
 
 def test_backup_restore_preserves_events_outbox_inbox_and_object_integrity() -> None:
@@ -174,3 +179,35 @@ def test_optional_distributed_adapters_fail_truthfully_when_uninstalled() -> Non
     if not temporal_available():
         with pytest.raises(RuntimeError, match="temporal"):
             require_optional_adapter("temporal")
+
+
+def test_fault_campaign_meets_declared_reference_rpo_rto_and_semantic_safety() -> None:
+    result = FaultCampaignResult(
+        faults=("node_loss", "object_corruption", "queue_duplicate", "provider_timeout", "network_partition"),
+        lost_events=0, recovery_ticks=2, availability=0.99,
+        duplicate_irreversible_effects=0, semantic_match=True, tenant_isolation_violations=0,
+    )
+    assert result.meets(RecoveryObjectives(0, 3, 0.99))
+    assert not replace(result, duplicate_irreversible_effects=1).meets(
+        RecoveryObjectives(0, 3, 0.99)
+    )
+
+
+def test_system_snapshot_restores_durable_repository_objects_queue_and_fencing() -> None:
+    system = DNCSystem()
+    system.event_repository.append(_event(), expected_version=0)
+    digest = system.object_store.put(b"artifact", tenant_id="tenant-a")
+    system.work_queue.submit(_work())
+    first = system.work_queue.lease(
+        "w1", worker_id="worker", now_ns=1, duration_ns=5,
+        resources={"cpu": 1, "memory": 2},
+    )
+    snapshot = system.capture_execution_snapshot("phase13")
+    system.event_repository.append(_event(2), expected_version=1)
+    system.object_store.corrupt_for_test(digest, tenant_id="tenant-a", data=b"bad")
+    system.work_queue.reconcile(now_ns=6)
+    system.restore_execution_snapshot(snapshot)
+    assert system.event_repository.load("task-1", tenant_id="tenant-a") == (_event(),)
+    assert system.object_store.get(digest, tenant_id="tenant-a") == b"artifact"
+    restored = system.work_queue.snapshot()
+    assert restored[2]["w1"].fencing_token == first.fencing_token

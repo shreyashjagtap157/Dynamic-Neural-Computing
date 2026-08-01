@@ -1,28 +1,31 @@
 # Repository Status
 
-**As of:** 2026-07-27
-**Status:** Stabilized research platform; enterprise and neural integration remain in development
+**As of:** 2026-08-01
+**Status:** Integrated governed research/reference platform; external production qualification remains open
 **Package version:** `0.1.0.dev0`
 
 ## Truthful maturity statement
 
-DNC provides a tested Python research platform for governed dynamic computation graphs. It includes a generic structural IR, mutation transactions, projection, an execution core, provider dispatch, state/checkpoint/rollback behavior, provenance, replay, control and learning policies, distributed handoff primitives, and evaluation scaffolding.
+DNC provides a tested Python research platform for governed dynamic computation graphs. The integrated reference system includes structural mutation and rollback, typed cognition and semantic synthesis, capabilities and provider dispatch, assurance and adaptive halting, learned control/repair/memory, optional adaptive neural depth, durable/distributed reference primitives, enterprise policy and operational controls, scientific evaluation, and fail-closed pilot governance.
 
 It is **not yet** an enterprise production platform, distributed model-training system, end-to-end
 tensor-native dynamic-neural runtime, or proven state-of-the-art model architecture. The default
 `ReferenceExecutionCore` is deterministic test infrastructure. Portable tensor contracts and an
 optional PyTorch adapter exist, but graph projection, distributed training, and high-performance
-serving integration remain roadmap work.
+serving integration remain qualification work. Durable and enterprise components are process-local
+reference implementations unless their deployment profiles explicitly bind qualified infrastructure.
 
 ## Current verified baseline
 
-- The authoritative pytest suite collects and passes **186/186 tests**.
+- The authoritative pytest suite passes **399 tests**, with **2 intentional environment-dependent skips**.
 - The Phase 12 canonical lifecycle audit passes **8/8**.
 - The Phase 13 benchmark harness integrity audit passes **3/3**.
 - Production source passes Ruff and Python byte-compilation.
 - Editable package installation succeeds from `pyproject.toml`.
 - Specification reference and RFC 2119 invariant-declaration checks pass.
 - Architecture conformance passes: **30/30** discovered invariants have executable coverage and all **34/34** conformance tests pass.
+- The Phase 15 controlled hidden campaign is reproducible at evidence grade E2 with zero budget violations; it shows parity, not superiority, against the included strong reference baselines.
+- The Phase 16 local readiness audit is intentionally **NO-GO** because external canary outcomes and independent human approvals are absent.
 
 Test success establishes the implemented behavior only. It does not establish empirical superiority, state-of-the-art performance, or enterprise production readiness.
 
@@ -43,19 +46,34 @@ Test success establishes the implemented behavior only. It does not establish em
     an explicit pre-decision estimator boundary.
 13. Added the full necessity-signal taxonomy, corrected no-op/recovery and assessment semantics, and
     stopped counting graph bootstrap as adaptation.
+14. Integrated governed memory/skills, learned policy promotion, localized repair, semantic synthesis,
+    and optional adaptive-depth execution behind explicit authority and rollback boundaries.
+15. Added content-addressed persistence, durable queue/recovery, fencing/idempotency, distributed
+    protocol primitives, and complete integrated snapshot/restore coverage.
+16. Added workload identity, RBAC/ABAC, tenant quotas, kill switches, audit/data governance,
+    telemetry/SLOs, incident runbooks, signed-artifact verification, and SBOM support.
+17. Added frozen hidden evaluation with required baselines/ablations, uncertainty and subgroup
+    reporting, immutable artifacts, and explicit adverse/null-result handling.
+18. Added ordered offline/shadow/canary pilot governance, outcome and exercise evidence, operational
+    readiness, independent fingerprint-bound approvals, rollback, and a fail-closed GA decision.
 
 ## Known critical gaps
 
-1. Benchmark task quality still uses synthetic/reference outputs and constructed adaptation bonuses;
-   metadata-label precision/recall is a gate-consistency metric, not evidence of adaptation discovery.
-2. Generic execution units do not yet bind the new tensor, gradient, quantization, cache, and
+1. Controlled benchmark runners still use deterministic reference mechanisms. DNC has not shown
+   quality or cost superiority over the included strong baselines, and independent reproduction is open.
+2. Generic execution units do not yet bind tensor, gradient, quantization, cache, and
    compilation contracts into DNC-IR projection; optimizer and distributed-sharding contracts are
    still absent.
 3. The optional PyTorch adapter is a tested foundation, not a production training backend; JAX,
    ONNX, optimizer, sharding, artifact, and serving integrations are not implemented.
-4. Provider retry, streaming, cancellation, rate limiting, and accurate token/cost accounting are incomplete.
-5. Durable persistence, multi-process coordination, multi-tenancy, identity/access control, secrets, artifact signing, deployment manifests, and operational SLOs remain unimplemented.
-6. Load, soak, chaos, penetration, GPU, and distributed-training validation remain future release gates.
+4. Live provider behavior and real PostgreSQL/object-store/multi-process infrastructure require
+   qualification in the target deployment; process-local references do not establish those claims.
+5. Enterprise controls have local executable coverage but no independent penetration assessment,
+   deployment-specific privacy review, or sustained operations evidence.
+6. No real enterprise pilot has produced sustained E3 business outcomes or the required independent
+   product/domain/research/security/privacy/operations/architecture approvals.
+7. Load, soak, chaos, upgrade, penetration, GPU, and distributed-training validation remain external
+   release gates for applicable profiles.
 
 ## Repository organization
 

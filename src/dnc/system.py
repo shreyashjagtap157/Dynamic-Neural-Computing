@@ -7,7 +7,9 @@ applications must import it instead of importing executable phase scripts.
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+import hashlib
+import json
+from dataclasses import asdict, dataclass
 from typing import Optional, Protocol
 
 from dnc.assurance.calibration import AssuranceCalibrationRegistry, CalibrationKey
@@ -44,6 +46,8 @@ from dnc.policy_learning import (
     LearnedPolicyRegistry, LearnedPolicyVersion, PolicyDecision,
     TabularShadowPredictor, select_action,
 )
+from dnc.persistence import ContentAddressedObjectStore, DurableWorkQueue, EventRepository
+from dnc.enterprise import AuditLog, DataGovernance, KillSwitches
 from dnc.semantics.contracts import SemanticGraphCandidate
 from dnc.semantics.synthesis import SemanticSynthesizer, SynthesisRequest
 from dnc.semantics.validation import SemanticValidation, validate_semantic_candidate
@@ -54,7 +58,7 @@ from dnc.neural import AdaptiveDepthModel, AdaptiveDepthResult, NeuralExitEviden
 from dnc.observability.provenance import ProvenanceLog
 from dnc.projection.projector import StructuralProjector
 from dnc.transaction.manager import TransactionManager
-from dnc.kernel.errors import DNCCalibrationError, DNCCapabilityError
+from dnc.kernel.errors import DNCCalibrationError, DNCCapabilityError, DNCPolicyError
 
 
 class ExecutionCore(Protocol):
@@ -134,6 +138,12 @@ class DNCSystem:
         governed_memory: Optional[GovernedMemory] = None,
         skill_registry: Optional[SkillRegistry] = None,
         learned_policy_registry: Optional[LearnedPolicyRegistry] = None,
+        event_repository: Optional[EventRepository] = None,
+        object_store: Optional[ContentAddressedObjectStore] = None,
+        work_queue: Optional[DurableWorkQueue] = None,
+        audit_log: Optional[AuditLog] = None,
+        data_governance: Optional[DataGovernance] = None,
+        kill_switches: Optional[KillSwitches] = None,
     ) -> None:
         self.execution_id = execution_id
         self.config = config or DNCSystemConfig()
@@ -176,6 +186,12 @@ class DNCSystem:
         self.governed_memory = governed_memory or GovernedMemory()
         self.skill_registry = skill_registry or SkillRegistry()
         self.learned_policy_registry = learned_policy_registry or LearnedPolicyRegistry()
+        self.event_repository = event_repository or EventRepository()
+        self.object_store = object_store or ContentAddressedObjectStore()
+        self.work_queue = work_queue or DurableWorkQueue()
+        self.audit_log = audit_log or AuditLog()
+        self.data_governance = data_governance or DataGovernance()
+        self.kill_switches = kill_switches or KillSwitches()
         self.assessment_engine = AssessmentEngine()
         self.generator = ComputationGenerator()
         self.controller = StructuralController()
@@ -211,6 +227,59 @@ class DNCSystem:
             transaction_rollbacks=self._transaction_rollbacks,
         )
 
+    def deployment_profile_fingerprint(self) -> str:
+        """Identify the configured system profile used by evaluation or a pilot."""
+
+        components = {
+            "execution_core": type(self.execution_core).__qualname__,
+            "semantic_controller": type(self.semantic_controller).__qualname__,
+            "inference_policy": (
+                type(self.inference_policy).__qualname__
+                if self.inference_policy is not None
+                else None
+            ),
+            "capability_registry": type(self.capability_registry).__qualname__,
+            "verifier_registry": type(self.verifier_registry).__qualname__,
+            "memory": type(self.governed_memory).__qualname__,
+            "skill_registry": type(self.skill_registry).__qualname__,
+            "learned_policy_registry": type(self.learned_policy_registry).__qualname__,
+            "event_repository": type(self.event_repository).__qualname__,
+            "object_store": type(self.object_store).__qualname__,
+            "work_queue": type(self.work_queue).__qualname__,
+            "audit_log": type(self.audit_log).__qualname__,
+            "data_governance": type(self.data_governance).__qualname__,
+            "kill_switches": type(self.kill_switches).__qualname__,
+        }
+        payload = json.dumps(
+            {"config": asdict(self.config), "components": components},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(payload.encode("ascii")).hexdigest()
+
+    def _require_enterprise_permitted(
+        self,
+        *,
+        tenant_id: str | None = None,
+        capability_id: str = "",
+        model_id: str = "",
+        skill_id: str = "",
+        action_type: str = "",
+    ) -> None:
+        tenant = tenant_id or (
+            self.cognitive_state.task.tenant_id
+            if self.cognitive_state is not None
+            else "tenant-default"
+        )
+        if not self.kill_switches.permitted(
+            tenant_id=tenant,
+            capability_id=capability_id,
+            model_id=model_id,
+            skill_id=skill_id,
+            action_type=action_type,
+        ):
+            raise DNCPolicyError("enterprise kill switch denied operation")
+
     def capture_execution_snapshot(self, snapshot_id: str) -> Snapshot:
         """Capture integrated graph, cognition, capabilities, and lifecycle state."""
 
@@ -231,6 +300,12 @@ class DNCSystem:
                 "governed_memory": self.governed_memory.snapshot(),
                 "skill_registry": self.skill_registry.snapshot(),
                 "learned_policy_registry": self.learned_policy_registry.snapshot(),
+                "event_repository": self.event_repository.snapshot(),
+                "object_store": self.object_store.snapshot(),
+                "work_queue": self.work_queue.snapshot(),
+                "audit_log": self.audit_log.snapshot(),
+                "data_governance": self.data_governance.snapshot(),
+                "kill_switches": self.kill_switches.snapshot(),
                 "cycle_count": self._cycle_count,
                 "proposals_generated": self._proposals_generated,
                 "proposals_authorized": self._proposals_authorized,
@@ -260,13 +335,23 @@ class DNCSystem:
     ) -> CapabilitySelection:
         """Select an available Phase 4 capability through the canonical system."""
 
-        return CapabilityBroker(self.capability_registry).match(requirement, now_ns=now_ns)
+        self._require_enterprise_permitted(action_type=requirement.action_type.value)
+        selection = CapabilityBroker(self.capability_registry).match(requirement, now_ns=now_ns)
+        if selection.selected is not None:
+            self._require_enterprise_permitted(
+                capability_id=selection.selected.capability_id,
+                model_id=selection.selected.model_id,
+            )
+        return selection
 
     def verify_claim(
         self, claim: VerifierClaim, policy: CascadePolicy = CascadePolicy()
     ) -> CascadeResult:
         """Run a scoped Phase 5 verifier cascade through the canonical system."""
 
+        self._require_enterprise_permitted(
+            tenant_id=claim.tenant_id, action_type="VERIFY_CLAIM"
+        )
         return VerifierCascade(self.verifier_registry).run(claim, policy)
 
     def record_outcome_label(self, label: OutcomeLabel) -> None:
@@ -318,6 +403,7 @@ class DNCSystem:
     def decide_inference(self, context: HaltingContext) -> InferenceDecision:
         """Run the Phase 6 policy, retaining fixed-attempt rollback by default."""
 
+        self._require_enterprise_permitted(action_type="INFERENCE_DECISION")
         if self.inference_policy is None:
             raise DNCCapabilityError("no inference halting policy is configured")
         if self.config.enable_adaptive_halting:
@@ -329,9 +415,14 @@ class DNCSystem:
     ) -> ControllerDecision:
         """Select and optionally lifecycle-authorize one Phase 7 cognitive action."""
 
+        self._require_enterprise_permitted(action_type="COGNITIVE_CONTROL")
         if self.cognitive_state is not None and context.task_id != self.cognitive_state.task.task_id:
             raise ValueError("controller context MUST belong to the active cognitive task")
         decision = self.semantic_controller.select(context)
+        if decision.selected is not None:
+            self._require_enterprise_permitted(
+                action_type=decision.selected.proposal.action_type.value
+            )
         if authorize_lifecycle and decision.selected is not None:
             if self.cognitive_state is None:
                 raise ValueError("lifecycle authorization requires active cognitive state")
@@ -345,6 +436,13 @@ class DNCSystem:
     ) -> tuple[SemanticGraphCandidate, ...]:
         """Generate Phase 8 semantic DNC-IR candidates without mutating the graph."""
 
+        self._require_enterprise_permitted(
+            tenant_id=request.state.task.tenant_id, action_type="SYNTHESIZE_GRAPH"
+        )
+        for skill_id in request.skill_template_ids:
+            self._require_enterprise_permitted(
+                tenant_id=request.state.task.tenant_id, skill_id=skill_id
+            )
         if self.cognitive_state is None or request.state != self.cognitive_state:
             raise ValueError("synthesis request MUST use the active cognitive state")
         candidates = SemanticSynthesizer(self.capability_registry).synthesize(request)
@@ -364,6 +462,7 @@ class DNCSystem:
     ) -> tuple[bool, SemanticValidation]:
         """Validate and transactionally commit one semantic graph candidate."""
 
+        self._require_enterprise_permitted(action_type="APPLY_SEMANTIC_GRAPH")
         if self.cognitive_state is None:
             raise ValueError("semantic candidate application requires cognitive state")
         existing_units = tuple(
@@ -399,11 +498,15 @@ class DNCSystem:
     def repair_cognitive_state(self, root_item_id, recompute, verify) -> RepairOutcome:
         """Run Phase 9 localized repair within a snapshot rollback boundary."""
 
+        self._require_enterprise_permitted(action_type="REPAIR_COGNITIVE_STATE")
         return execute_localized_repair(self, root_item_id, recompute, verify)
 
     def retrieve_memory(self, kind: MemoryKind, **criteria):
         """Retrieve Phase 10 memory through tenant, freshness, and trust policy."""
 
+        self._require_enterprise_permitted(
+            tenant_id=criteria.get("tenant_id"), action_type="RETRIEVE_MEMORY"
+        )
         return self.governed_memory.store(kind).retrieve(**criteria)
 
     def select_learned_action(
@@ -420,6 +523,9 @@ class DNCSystem:
     ) -> PolicyDecision:
         """Use Phase 11 policy only when its independent low-risk gate permits it."""
 
+        self._require_enterprise_permitted(
+            model_id=policy.fingerprint, action_type="LEARNED_POLICY_SELECT"
+        )
         return select_action(
             policy=policy,
             predictor=predictor,
@@ -446,6 +552,11 @@ class DNCSystem:
     ) -> tuple[AdaptiveDepthResult, NeuralExitEvidence]:
         """Execute Phase 12 adaptive depth through an active model-matched capability."""
 
+        self._require_enterprise_permitted(
+            capability_id=capability_id,
+            model_id=model.model_fingerprint,
+            action_type="ADAPTIVE_NEURAL_EXECUTE",
+        )
         available = {card.capability_id: card for card in self.capability_registry.available()}
         card = available.get(capability_id)
         if card is None:
@@ -509,6 +620,30 @@ class DNCSystem:
         learned_policy_state = runtime_state.get("learned_policy_registry")
         if learned_policy_state is not None:
             restored_learned_policies.restore(learned_policy_state)
+        restored_event_repository = EventRepository()
+        event_repository_state = runtime_state.get("event_repository")
+        if event_repository_state is not None:
+            restored_event_repository.restore(event_repository_state)
+        restored_object_store = ContentAddressedObjectStore()
+        object_store_state = runtime_state.get("object_store")
+        if object_store_state is not None:
+            restored_object_store.restore(object_store_state)
+        restored_work_queue = DurableWorkQueue()
+        work_queue_state = runtime_state.get("work_queue")
+        if work_queue_state is not None:
+            restored_work_queue.restore(work_queue_state)
+        restored_audit_log = AuditLog()
+        audit_log_state = runtime_state.get("audit_log")
+        if audit_log_state is not None:
+            restored_audit_log.restore(audit_log_state)
+        restored_data_governance = DataGovernance()
+        data_governance_state = runtime_state.get("data_governance")
+        if data_governance_state is not None:
+            restored_data_governance.restore(data_governance_state)
+        restored_kill_switches = KillSwitches()
+        kill_switch_state = runtime_state.get("kill_switches")
+        if kill_switch_state is not None:
+            restored_kill_switches.restore(kill_switch_state)
 
         restored_counters = {
             "cycle_count": int(runtime_state.get("cycle_count", self._cycle_count)),
@@ -548,6 +683,18 @@ class DNCSystem:
             self.skill_registry.restore(restored_skills.snapshot())
         if learned_policy_state is not None:
             self.learned_policy_registry.restore(restored_learned_policies.snapshot())
+        if event_repository_state is not None:
+            self.event_repository.restore(restored_event_repository.snapshot())
+        if object_store_state is not None:
+            self.object_store.restore(restored_object_store.snapshot())
+        if work_queue_state is not None:
+            self.work_queue.restore(restored_work_queue.snapshot())
+        if audit_log_state is not None:
+            self.audit_log.restore(restored_audit_log.snapshot())
+        if data_governance_state is not None:
+            self.data_governance.restore(restored_data_governance.snapshot())
+        if kill_switch_state is not None:
+            self.kill_switches.restore(restored_kill_switches.snapshot())
         self._cycle_count = restored_counters["cycle_count"]
         self._proposals_generated = restored_counters["proposals_generated"]
         self._proposals_authorized = restored_counters["proposals_authorized"]
@@ -565,6 +712,7 @@ class DNCSystem:
         necessity_signals: frozenset[NecessitySignal] = frozenset(),
     ) -> tuple[bool, Optional[Assessment], Optional[MutationProposal]]:
         """Run GENERATE→AUTHORIZE→TRANSACT→EXECUTE→ASSESS→LEARN once."""
+        self._require_enterprise_permitted(action_type="STRUCTURAL_CYCLE")
         self._cycle_count += 1
         graph_before_version = str(self.graph.version)
         last_utility = (

@@ -6,10 +6,12 @@ from dnc.persistence.contracts import (
 )
 from dnc.persistence.object_store import ContentAddressedObjectStore
 from dnc.persistence.repository import EventRepository
+from dnc.persistence.recovery import FaultCampaignResult, RecoveryObjectives
 from dnc.persistence.workers import DurableWorkQueue
 
 __all__ = [
     "ContentAddressedObjectStore", "DurableEvent", "DurableWorkQueue", "EventRepository",
-    "Lease", "OutboxMessage", "WorkItem", "WorkStatus", "WorkerResult",
+    "FaultCampaignResult", "Lease", "OutboxMessage", "RecoveryObjectives",
+    "WorkItem", "WorkStatus", "WorkerResult",
     "ray_available", "require_optional_adapter", "temporal_available",
 ]

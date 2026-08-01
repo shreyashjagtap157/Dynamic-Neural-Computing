@@ -1,0 +1,126 @@
+{
+  "decision": "NO-GO",
+  "evidence_grade": "E2-local-controlled",
+  "limitations": [
+    "No external canary observations are present.",
+    "No human owner approvals are present.",
+    "Local exercises validate control mechanics, not production operations."
+  ],
+  "program": {
+    "approvals": [],
+    "criteria": {
+      "baseline_value": 0.5,
+      "maximum_cost_per_case": 5,
+      "maximum_failure_rate": 0.05,
+      "maximum_p95_latency_ms": 1000,
+      "minimum_business_value": 0.6,
+      "minimum_duration_days": 14,
+      "minimum_observations": 30,
+      "require_delayed_outcomes": true,
+      "require_operator_feedback": true
+    },
+    "exercises": [
+      {
+        "evidence_uri": "local://phase16/disaster_recovery",
+        "exercised_by": "local-test-harness",
+        "kind": "disaster_recovery",
+        "passed": true
+      },
+      {
+        "evidence_uri": "local://phase16/incident",
+        "exercised_by": "local-test-harness",
+        "kind": "incident",
+        "passed": true
+      },
+      {
+        "evidence_uri": "local://phase16/model_change",
+        "exercised_by": "local-test-harness",
+        "kind": "model_change",
+        "passed": true
+      },
+      {
+        "evidence_uri": "local://phase16/policy_change",
+        "exercised_by": "local-test-harness",
+        "kind": "policy_change",
+        "passed": true
+      },
+      {
+        "evidence_uri": "local://phase16/provider_change",
+        "exercised_by": "local-test-harness",
+        "kind": "provider_change",
+        "passed": true
+      },
+      {
+        "evidence_uri": "local://phase16/skill_rollback",
+        "exercised_by": "local-test-harness",
+        "kind": "skill_rollback",
+        "passed": true
+      }
+    ],
+    "observations": [
+      {
+        "business_value": 0.8,
+        "cost": 0.1,
+        "day": 0,
+        "delayed_outcome": 0.8,
+        "external": false,
+        "failed": false,
+        "latency_ms": 10,
+        "observation_id": "offline-reference",
+        "operator_feedback": "local test operator",
+        "source": "deterministic-local-reference",
+        "stage": "offline_replay"
+      },
+      {
+        "business_value": 0.8,
+        "cost": 0.1,
+        "day": 0,
+        "delayed_outcome": 0.8,
+        "external": false,
+        "failed": false,
+        "latency_ms": 10,
+        "observation_id": "shadow-reference",
+        "operator_feedback": "local test operator",
+        "source": "deterministic-local-reference",
+        "stage": "shadow"
+      }
+    ],
+    "readiness": {
+      "capacity_plan": "docs/pilot/PHASE16-PILOT-PLAN.md#capacity-and-cost",
+      "cost_plan": "docs/pilot/PHASE16-PILOT-PLAN.md#capacity-and-cost",
+      "customer_documentation": "docs/pilot/PHASE16-PILOT-PLAN.md#operator-boundary",
+      "deprecation_policy": "docs/pilot/PHASE16-PILOT-PLAN.md#lifecycle",
+      "support_model": "docs/pilot/PHASE16-PILOT-PLAN.md#support",
+      "upgrade_policy": "docs/pilot/PHASE16-PILOT-PLAN.md#lifecycle"
+    },
+    "stage": "limited_canary",
+    "workflow": {
+      "critical": false,
+      "data_classification": "synthetic",
+      "domain": "controlled-reference",
+      "domain_owner": "unassigned-external-owner",
+      "outcome_measurable": true,
+      "reversible": true,
+      "rollback_target": "static-reference-review-v1",
+      "system_fingerprint": "0cf17a80e291f22f9743aee8352f9732035efe57c399398babb9f3fe60845832",
+      "version": "1",
+      "workflow_id": "reference-document-review"
+    }
+  },
+  "review": {
+    "approved": false,
+    "evidence_fingerprint": "9d726141fef7cda247f76ac31a6d9ec5f3f5a64ec18a9157f2221dbed50ae5d7",
+    "qualified_domain": "controlled-reference",
+    "reasons": [
+      "insufficient external canary observations",
+      "missing architecture approval",
+      "missing domain approval",
+      "missing operations approval",
+      "missing privacy approval",
+      "missing product approval",
+      "missing research approval",
+      "missing security approval"
+    ],
+    "workflow_fingerprint": "cda9d476c40d18813ea2ff43605831ee74acd98c104c455d7f32c2edaa4860ad"
+  }
+}
