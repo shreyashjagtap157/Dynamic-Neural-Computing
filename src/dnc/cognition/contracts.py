@@ -225,8 +225,18 @@ class ConfidenceEstimate:
     method: str = "unavailable"
     calibration_model: str | None = None
     calibration_dataset: str | None = None
+    calibration_split: str | None = None
+    calibration_version: str | None = None
     domain: str = "general"
     risk_class: RiskClass = RiskClass.MEDIUM
+    capability_fingerprint: str | None = None
+    prompt_fingerprint: str | None = None
+    verifier_fingerprints: tuple[str, ...] = ()
+    sample_count: int = 0
+    semantic_cluster_count: int = 0
+    correlation_groups: tuple[str, ...] = ()
+    held_out_metrics: dict[str, float] = field(default_factory=dict)
+    shift_indicators: dict[str, float] = field(default_factory=dict)
     applicability_status: str = "unavailable"
     schema_version: str = COGNITIVE_SCHEMA_VERSION
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -238,6 +248,14 @@ class ConfidenceEstimate:
             value = getattr(self, name)
             if value is not None and not 0.0 <= value <= 1.0:
                 raise ValueError(f"{name} MUST be between 0 and 1")
+        numeric = (self.p_correct, self.failure_probability, self.lower_bound, self.upper_bound)
+        if any(value is not None for value in numeric) and self.applicability_status not in {
+            "calibrated",
+            "extrapolated",
+        }:
+            raise ValueError("numeric confidence requires applicable calibration evidence")
+        if self.sample_count < 0 or self.semantic_cluster_count < 0:
+            raise ValueError("confidence sample and cluster counts MUST be non-negative")
 
 
 @dataclass(frozen=True)

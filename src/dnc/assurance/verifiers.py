@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
+import math
 import operator
 import re
 from dataclasses import dataclass
@@ -39,6 +40,15 @@ class FunctionalVerifier:
                 {"error_type": type(exc).__name__, "error": str(exc)},
             )
         return _result(self.descriptor, claim, status, reasons, details)
+
+
+@dataclass(frozen=True)
+class CallbackVerifierAdapter(FunctionalVerifier):
+    """External, model, or human verifier adapter with declared independence."""
+
+    def __post_init__(self) -> None:
+        if self.descriptor.kind.value not in {"EXTERNAL", "MODEL", "HUMAN"}:
+            raise ValueError("callback verifier adapters MUST declare external, model, or human kind")
 
 
 def format_check(*, pattern: str | None = None, non_empty: bool = True) -> Check:
@@ -97,6 +107,16 @@ def callable_check(callback: Callable[[Any], bool], success_code: str) -> Check:
     return check
 
 
+def code_test_check(runner: Callable[[Any], bool]) -> Check:
+    """Delegate code/test verification to an injected isolated runner."""
+
+    return callable_check(runner, "CODE_TEST_VALID")
+
+
+def policy_check(evaluator: Callable[[Any], bool]) -> Check:
+    return callable_check(evaluator, "POLICY_VALID")
+
+
 def provenance_check(claim: VerifierClaim):
     valid = bool(claim.evidence) and all(
         getattr(item, "artifact_hash", None)
@@ -138,6 +158,8 @@ def _result(
 def _schema_errors(value: Any, schema: dict[str, Any]) -> list[str]:
     expected_type = schema.get("type")
     types = {"object": dict, "array": list, "string": str, "number": (int, float), "integer": int, "boolean": bool}
+    if expected_type in {"number", "integer"} and isinstance(value, bool):
+        return ["TYPE_MISMATCH"]
     if expected_type in types and not isinstance(value, types[expected_type]):
         return ["TYPE_MISMATCH"]
     errors: list[str] = []
@@ -154,13 +176,22 @@ _UNARY = {ast.UAdd: operator.pos, ast.USub: operator.neg}
 
 
 def _safe_arithmetic(expression: str) -> float:
+    if len(expression) > 256:
+        raise ValueError("arithmetic expression exceeds size limit")
+
     def evaluate(node: ast.AST) -> float:
         if isinstance(node, ast.Expression):
             return evaluate(node.body)
         if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
             return float(node.value)
         if isinstance(node, ast.BinOp) and type(node.op) in _OPS:
-            return float(_OPS[type(node.op)](evaluate(node.left), evaluate(node.right)))
+            left, right = evaluate(node.left), evaluate(node.right)
+            if isinstance(node.op, ast.Pow) and abs(right) > 12:
+                raise ValueError("arithmetic exponent exceeds limit")
+            result = float(_OPS[type(node.op)](left, right))
+            if not math.isfinite(result) or abs(result) > 1e100:
+                raise ValueError("arithmetic result exceeds limit")
+            return result
         if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY:
             return float(_UNARY[type(node.op)](evaluate(node.operand)))
         raise ValueError("unsupported arithmetic expression")

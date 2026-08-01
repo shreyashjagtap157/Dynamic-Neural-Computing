@@ -10,6 +10,11 @@ import copy
 from dataclasses import dataclass
 from typing import Optional, Protocol
 
+from dnc.assurance.calibration import AssuranceCalibrationRegistry
+from dnc.assurance.contracts import VerifierClaim
+from dnc.assurance.outcomes import OutcomeLabelStore
+from dnc.assurance.policy import RiskPolicyRegistry
+from dnc.assurance.registry import CascadePolicy, CascadeResult, VerifierCascade, VerifierRegistry
 from dnc.capabilities.broker import CapabilityBroker
 from dnc.capabilities.contracts import CapabilityRequirement, CapabilitySelection
 from dnc.capabilities.registry import CapabilityRegistry
@@ -102,6 +107,10 @@ class DNCSystem:
         initial_graph: Optional[StructuralGraph] = None,
         cognitive_state: Optional[CognitiveState] = None,
         capability_registry: Optional[CapabilityRegistry] = None,
+        verifier_registry: Optional[VerifierRegistry] = None,
+        assurance_calibrations: Optional[AssuranceCalibrationRegistry] = None,
+        outcome_labels: Optional[OutcomeLabelStore] = None,
+        risk_policies: Optional[RiskPolicyRegistry] = None,
     ) -> None:
         self.execution_id = execution_id
         self.config = config or DNCSystemConfig()
@@ -134,6 +143,11 @@ class DNCSystem:
         self.execution_core = selected_core
         self.cognitive_state = cognitive_state
         self.capability_registry = capability_registry or CapabilityRegistry()
+        self.verifier_registry = verifier_registry or VerifierRegistry()
+        self.assurance_calibrations = assurance_calibrations or AssuranceCalibrationRegistry()
+        self.capability_registry.add_change_listener(self.assurance_calibrations.handle_model_change)
+        self.outcome_labels = outcome_labels or OutcomeLabelStore()
+        self.risk_policies = risk_policies or RiskPolicyRegistry()
         self.assessment_engine = AssessmentEngine()
         self.generator = ComputationGenerator()
         self.controller = StructuralController()
@@ -216,6 +230,13 @@ class DNCSystem:
         """Select an available Phase 4 capability through the canonical system."""
 
         return CapabilityBroker(self.capability_registry).match(requirement, now_ns=now_ns)
+
+    def verify_claim(
+        self, claim: VerifierClaim, policy: CascadePolicy = CascadePolicy()
+    ) -> CascadeResult:
+        """Run a scoped Phase 5 verifier cascade through the canonical system."""
+
+        return VerifierCascade(self.verifier_registry).run(claim, policy)
 
     def restore_execution_snapshot(self, snapshot: Snapshot) -> None:
         """Atomically restore integrated process-local state from a snapshot."""

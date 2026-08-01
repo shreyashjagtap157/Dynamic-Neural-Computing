@@ -90,3 +90,4 @@ These documents are draft governance extensions for the expanded DNC intent. The
 | PHASE2-SNAPSHOT | Snapshot manifest, isolation grades, reproducibility grades, and effect ledger | Draft | K |
 | PHASE3-COGNITION | Canonical cognitive contracts, epistemic state, schema hashing, import/export, and invalidation | Draft | C |
 | PHASE4-CAPABILITIES | Capability registry, auditable broker, provider-neutral adapters, resilience, and backend cards | Draft | C |
+| PHASE5-ASSURANCE | Scoped verifiers, delayed outcomes, calibration artifacts, semantic agreement, shift, and risk policy | Draft | C |

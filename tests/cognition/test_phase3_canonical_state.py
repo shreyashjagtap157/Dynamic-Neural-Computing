@@ -195,6 +195,7 @@ def test_action_lifecycle_outcome_confidence_and_rationale_records() -> None:
         lower_bound=0.8,
         upper_bound=0.97,
         method="deterministic-verifier",
+        applicability_status="extrapolated",
     )
     outcome = ActionOutcome(
         outcome_id="out-1",
