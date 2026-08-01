@@ -35,11 +35,13 @@ from dnc.execution.snapshot import ReferenceSnapshotManager, Snapshot
 from dnc.ir.graph import StructuralGraph
 from dnc.ir.identity import GraphID
 from dnc.ir.validator import DNCIRValidator
+from dnc.halting.contracts import HaltingContext, InferenceDecision
+from dnc.halting.policy import AdaptiveHaltingPolicy
 from dnc.mutation.engine import MutationEngine
 from dnc.observability.provenance import ProvenanceLog
 from dnc.projection.projector import StructuralProjector
 from dnc.transaction.manager import TransactionManager
-from dnc.kernel.errors import DNCCalibrationError
+from dnc.kernel.errors import DNCCalibrationError, DNCCapabilityError
 
 
 class ExecutionCore(Protocol):
@@ -79,6 +81,7 @@ class DNCSystemConfig:
     enable_provenance: bool = True
     production_mode: bool = False
     allow_synthetic_execution: bool = False
+    enable_adaptive_halting: bool = False
 
 
 @dataclass(frozen=True)
@@ -113,6 +116,7 @@ class DNCSystem:
         assurance_calibrations: Optional[AssuranceCalibrationRegistry] = None,
         outcome_labels: Optional[OutcomeLabelStore] = None,
         risk_policies: Optional[RiskPolicyRegistry] = None,
+        inference_policy: Optional[AdaptiveHaltingPolicy] = None,
     ) -> None:
         self.execution_id = execution_id
         self.config = config or DNCSystemConfig()
@@ -150,6 +154,7 @@ class DNCSystem:
         self.capability_registry.add_change_listener(self.assurance_calibrations.handle_model_change)
         self.outcome_labels = outcome_labels or OutcomeLabelStore()
         self.risk_policies = risk_policies or RiskPolicyRegistry()
+        self.inference_policy = inference_policy
         self.assessment_engine = AssessmentEngine()
         self.generator = ComputationGenerator()
         self.controller = StructuralController()
@@ -285,6 +290,15 @@ class DNCSystem:
             semantic_cluster_count=semantic_cluster_count,
             correlation_groups=correlation_groups,
         )
+
+    def decide_inference(self, context: HaltingContext) -> InferenceDecision:
+        """Run the Phase 6 policy, retaining fixed-attempt rollback by default."""
+
+        if self.inference_policy is None:
+            raise DNCCapabilityError("no inference halting policy is configured")
+        if self.config.enable_adaptive_halting:
+            return self.inference_policy.decide(context)
+        return self.inference_policy.fallback.decide(context)
 
     def restore_execution_snapshot(self, snapshot: Snapshot) -> None:
         """Atomically restore integrated process-local state from a snapshot."""
