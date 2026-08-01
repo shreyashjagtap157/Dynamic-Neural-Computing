@@ -6,7 +6,8 @@
 
 **Starting commit:** `2b5fb84`
 
-**Current state:** M1 in progress; `M1-IR-001` through `M1-IR-003` and `M1-RT-001` complete
+**Current state:** M1 in progress; `M1-IR-001` through `M1-IR-003`, `M1-RT-001`, and
+`M1-SDK-001` complete
 
 ## Completed work package
 
@@ -79,23 +80,47 @@ The completion commit is the commit titled `Harden atomic rollback and replay gr
 resolve its exact ID with
 `git log --oneline --grep='Harden atomic rollback and replay grade admission' -1`.
 
+### M1-SDK-001 — SDK, CLI, plugin, and registry foundations
+
+- Packages `dnc.plugin.manifest` 1.0.0 as JSON Schema and a dependency-free canonical manifest API,
+  with strict headers, semantic versions, normalized identities, current DNC-IR compatibility, and
+  deterministic SHA-256 fingerprints.
+- Requires explicit manifest-digest trust plus capability and permission grants at registration and
+  load time; rechecks the loaded object's manifest and documents that in-process Python import is a
+  trusted-code boundary rather than a sandbox.
+- Adds the stable `DNCSDK` 1.0.0 facade for graph parsing, validation, inspection, projection, artifact
+  registration, graph registration, and governed graph load.
+- Adds `dnc graph validate`, `inspect`, and `project` through both a packaged console script and
+  `python -m dnc`, with JSON results, nonzero failure status, standard-input support, output files, and
+  strict execution-context parsing.
+- Builds tenant-scoped artifact and graph registries on the existing content-addressed object store;
+  graph registration and load repeat schema, invariant, tenant, and execution-context admission.
+- Makes canonical edge ordering include port bindings so same-endpoint typed graphs receive stable
+  content hashes independent of insertion order, and rejects non-finite registry JSON.
+
+The completion commit is the commit titled `Add governed SDK plugin and registry foundations`;
+resolve its exact ID with
+`git log --oneline --grep='Add governed SDK plugin and registry foundations' -1`.
+
 ## Verification evidence
 
-- `python -W error -m pytest -q`: 437 passed, 2 intentional environment-dependent skips.
+- `python -W error -m pytest -q`: 464 passed, 2 intentional environment-dependent skips.
 - `python -m compileall -q src`: passed.
 - `python -m ruff check src tests tools/generate_conformance_report.py`: passed.
 - `PYTHONPATH=src python scripts/audits/phase12_system_audit.py`: 8/8 passed.
 - Specification reference and RFC 2119 checks: passed.
 - Architecture conformance: 30/30 invariants covered, 35/35 tests passed, 4/4 ACDs resolved.
-- A locally built wheel contains all supported 1.1.0, 1.2.0, and 1.3.0 structural-graph schemas.
+- A locally built wheel contains all supported 1.1.0, 1.2.0, and 1.3.0 structural-graph schemas plus
+  plugin-manifest 1.0.0; an isolated installation exposes the `dnc` console command and SDK facade.
 
 ## Claims and residual risks
 
 This work supports a versioned and packaged Generic DNC-IR envelope plus typed port/edge validation.
 It does not yet provide a general schema migration framework beyond the explicit 1.1.0/1.2.0 readers,
-nor does it complete M1's SDK, registry, property, fuzz, concurrency, or broader failure-testing
-commitments. The headerless legacy path is intentionally less strict and should be migrated before
-any future removal.
+nor does it complete M1's property, fuzz, concurrency, or broader failure-testing commitments. The
+headerless legacy path is intentionally less strict and should be migrated before any future removal.
+M1 registries remain process-local references, and plugin admission does not make imported Python code
+safe; untrusted plugins require stronger isolation.
 
 Rollback of `M1-IR-002` returns canonical output to 1.1.0; consumers needing rollback must avoid
 persisting 1.2.0-only port bindings or first project them to an explicitly untyped legacy profile.
@@ -108,9 +133,14 @@ Rollback of `M1-RT-001` removes snapshot 0.2 evidence hashes and replay admissio
 manifests must be retained or explicitly downgraded only to claims supported by 0.1 fields; R3/R4
 claims must not survive such a downgrade.
 
+Rollback of `M1-SDK-001` removes SDK/CLI entry points, registry descriptors, and plugin-manifest 1.0.0.
+Content bytes remain addressable only through the underlying object-store API; callers must retain
+their tenant and digest mapping before rollback, and must not auto-import previously admitted plugins.
+
 ## Exact next point
 
-Implement `M1-SDK-001`: define a versioned plugin manifest and loader boundary, a stable Python SDK
-facade, a minimal CLI for graph validate/inspect/project operations, and content-addressed artifact and
-graph registries. Keep optional plugins out of the core dependency set, enforce schema/governance at
-registration and load time, and add compatibility plus command-level failure tests.
+Implement `M1-QA-001`: exercise the complete M1 IR, transaction/replay, SDK, plugin, CLI, and registry
+surface with deterministic property generators, bounded malformed-input fuzzing, thread concurrency,
+injected storage/import/copy failures, and explicit 1.1.0/1.2.0/current compatibility matrices. Fix
+every reproducible defect, retain deterministic seeds/cases, and then run the complete phase release
+gate before integrating and pushing M1.

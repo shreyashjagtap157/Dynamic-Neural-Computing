@@ -133,7 +133,16 @@ class DNWIRSerializer:
             }
 
         # Sort edges by source, target, type for determinism
-        sorted_edges = sorted(graph.edges, key=lambda e: (e.source.value, e.target.value, e.edge_type.value))
+        sorted_edges = sorted(
+            graph.edges,
+            key=lambda e: (
+                e.source.value,
+                e.target.value,
+                e.edge_type.value,
+                e.source_port or "",
+                e.target_port or "",
+            ),
+        )
         for e in sorted_edges:
             data["edges"].append({
                 "source": e.source.value,

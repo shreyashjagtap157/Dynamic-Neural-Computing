@@ -84,6 +84,62 @@ def test_typed_data_edge_validates_roundtrips_and_projects_ports() -> None:
     assert graph.units["source"].contract.port("out").schema == JSON_STRING
 
 
+def test_canonical_serialization_orders_same_endpoint_edges_by_ports() -> None:
+    source = _unit(
+        "source",
+        _port(
+            "out-b",
+            PortDirection.OUTPUT,
+            cardinality=PortCardinality.ZERO_OR_MORE,
+        ),
+        _port(
+            "out-a",
+            PortDirection.OUTPUT,
+            cardinality=PortCardinality.ZERO_OR_MORE,
+        ),
+    )
+    target = _unit(
+        "target",
+        _port(
+            "in-b",
+            PortDirection.INPUT,
+            cardinality=PortCardinality.ZERO_OR_MORE,
+        ),
+        _port(
+            "in-a",
+            PortDirection.INPUT,
+            cardinality=PortCardinality.ZERO_OR_MORE,
+        ),
+    )
+    first = StructuralGraph(GraphID("same-endpoint"))
+    first.add_unit(source)
+    first.add_unit(target)
+    edge_a = Edge(
+        source.unit_id,
+        target.unit_id,
+        EdgeType.DATA,
+        source_port="out-a",
+        target_port="in-a",
+    )
+    edge_b = Edge(
+        source.unit_id,
+        target.unit_id,
+        EdgeType.DATA,
+        source_port="out-b",
+        target_port="in-b",
+    )
+    first.add_edge(edge_b)
+    first.add_edge(edge_a)
+    second = StructuralGraph(
+        GraphID("same-endpoint"),
+        units=dict(first.units),
+        edges=[edge_a, edge_b],
+    )
+
+    assert DNCIRValidator().validate_graph(first).is_valid
+    assert DNWIRSerializer.to_json(first) == DNWIRSerializer.to_json(second)
+
+
 def test_resource_edges_are_typed_without_becoming_execution_dependencies() -> None:
     graph = _typed_graph(PortKind.RESOURCE)
 

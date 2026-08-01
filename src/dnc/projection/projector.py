@@ -92,7 +92,16 @@ class StructuralProjector:
                 security=unit.contract.security,
             )
 
-        sorted_edges = sorted(graph.edges, key=lambda e: (e.source.value, e.target.value, e.edge_type.value))
+        sorted_edges = sorted(
+            graph.edges,
+            key=lambda e: (
+                e.source.value,
+                e.target.value,
+                e.edge_type.value,
+                e.source_port or "",
+                e.target_port or "",
+            ),
+        )
         for e in sorted_edges:
             exec_dag.edges.append(ExecutableEdge(
                 source=e.source,

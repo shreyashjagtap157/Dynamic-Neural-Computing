@@ -17,7 +17,7 @@ reference implementations unless their deployment profiles explicitly bind quali
 
 ## Current verified baseline
 
-- The authoritative pytest suite passes **437 tests**, with **2 intentional environment-dependent skips**.
+- The authoritative pytest suite passes **464 tests**, with **2 intentional environment-dependent skips**.
 - The Phase 12 canonical lifecycle audit passes **8/8**.
 - The Phase 13 benchmark harness integrity audit passes **3/3**.
 - Production source passes Ruff and Python byte-compilation.
@@ -69,6 +69,9 @@ Test success establishes the implemented behavior only. It does not establish em
 23. Hardened transaction payload isolation and rollback faults, canonical structural replay evidence,
     trace-only versus fresh-runtime replay claims, and snapshot 0.2 R2/R3/R4 admission with
     integrity-bound provider recording and effect-ledger evidence.
+24. Added the stable Python SDK and graph CLI, packaged a versioned fingerprint-pinned plugin
+    contract, and built tenant-scoped content-addressed artifact/graph registries with repeated
+    governance admission.
 
 ## Known critical gaps
 
@@ -78,7 +81,7 @@ Test success establishes the implemented behavior only. It does not establish em
    compilation contracts into DNC-IR projection; optimizer and distributed-sharding contracts are
    still absent.
 3. The optional PyTorch adapter is a tested foundation, not a production training backend; JAX,
-   ONNX, optimizer, sharding, artifact, and serving integrations are not implemented.
+   ONNX, optimizer, sharding, external artifact-store, and serving integrations are not implemented.
 4. Live provider behavior and real PostgreSQL/object-store/multi-process infrastructure require
    qualification in the target deployment; process-local references do not establish those claims.
 5. Enterprise controls have local executable coverage but no independent penetration assessment,

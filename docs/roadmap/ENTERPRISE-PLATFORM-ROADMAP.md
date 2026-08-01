@@ -31,7 +31,7 @@ DNC will be a substrate-neutral, governed runtime for dynamically constructing, 
 - validated ports and data/control/state/resource edges — **COMPLETE (`M1-IR-002`)**;
 - idempotency, side-effect, placement, and security contracts — **COMPLETE (`M1-IR-003`)**;
 - atomic transaction/rollback and explicit replay grades — **COMPLETE (`M1-RT-001`)**;
-- plugin SDK, CLI, Python SDK, artifact and graph registry;
+- plugin SDK, CLI, Python SDK, artifact and graph registry — **COMPLETE (`M1-SDK-001`)**;
 - property, fuzz, concurrency, failure, and compatibility tests.
 
 `M1-IR-001` adds a packaged canonical JSON Schema, strict semantic-version and
@@ -48,8 +48,11 @@ combinations, requires an authorized execution context before governed projectio
 `M1-RT-001` isolates submitted operation payloads, converts copy faults into deterministic rollback,
 strengthens structural replay to canonical-content verification, distinguishes trace inspection from
 fresh-runtime replay, and admits R2–R4 only from matching snapshot evidence.
-The next dependency-ordered point is `M1-SDK-001`: plugin SDK, CLI, Python SDK, and artifact/graph
-registry foundations.
+`M1-SDK-001` adds a packaged versioned plugin-manifest contract, fingerprint-pinned least-authority
+loading, a stable Python SDK facade, a machine-readable graph CLI, and tenant-scoped content-addressed
+artifact/graph registries with repeated schema and governance admission.
+The next dependency-ordered point is `M1-QA-001`: property, fuzz, concurrency, failure, and
+compatibility tests for the complete M1 surface.
 
 ### M2 — Real LLM reasoning runtime
 

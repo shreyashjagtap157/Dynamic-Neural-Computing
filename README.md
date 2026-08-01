@@ -21,9 +21,21 @@ pytest
 # Lint
 python -m ruff check src/
 
+# Validate and inspect a Generic DNC-IR document
+dnc graph validate graph.json
+dnc graph inspect graph.json
+
+# Project an admitted graph to an executable DAG
+dnc graph project graph.json --output executable.json
+
 # Freeze spec (Draft -> Baseline)
 python tools/freeze_spec.py
 ```
+
+The same CLI is available as `python -m dnc`. Governed graphs require
+`--context execution-context.json`; `--structural-only` validates structure without claiming execution
+admission. See the [M1 SDK usage guide](docs/project/M1-SDK-USAGE.md) for the Python facade,
+content-addressed registries, and fingerprint-pinned plugin boundary.
 
 ## What is DNC?
 
@@ -105,5 +117,6 @@ dependencies and optional future backend integrations are declared through
 
 - [Documentation index](docs/README.md)
 - [Current status](docs/project/REPOSITORY-STATUS.md)
+- [M1 SDK and plugin usage](docs/project/M1-SDK-USAGE.md)
 - [User questions and research assessments](docs/research/USER-QUESTIONS-AND-ASSESSMENTS.md)
 - [Enterprise platform roadmap](docs/roadmap/ENTERPRISE-PLATFORM-ROADMAP.md)

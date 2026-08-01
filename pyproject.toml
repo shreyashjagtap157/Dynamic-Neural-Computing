@@ -11,6 +11,9 @@ requires-python = ">=3.11"
 authors = [{name = "Dynamic Neural Computing contributors"}]
 dependencies = []
 
+[project.scripts]
+dnc = "dnc.cli:main"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8",
